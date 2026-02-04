@@ -72,8 +72,41 @@ export async function getCategories_server(): Promise<Category[]> {
   return data || [];
 }
 
+// SERVER-SIDE FUNCTION: fetch single category by id
+export async function getCategoryById_server(categoryId: string): Promise<Category | null> {
+  // Guard against invalid ids
+  if (!categoryId || categoryId === 'undefined') {
+    console.error(`Invalid categoryId provided to getCategoryById_server: ${categoryId}`);
+    return null;
+  }
+
+  // If service role is not available, try to match from fallback
+  if (!supabaseService) {
+    const fallbackMatch = FALLBACK_CATEGORIES.find(c => c.id === categoryId) || null;
+    return fallbackMatch || null;
+  }
+
+  const { data, error } = await supabaseService
+    .from('categories')
+    .select('id, name, icon')
+    .eq('id', categoryId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error fetching category ${categoryId} from server:`, JSON.stringify(error, null, 2));
+    return null;
+  }
+  return data || null;
+}
+
 // SERVER-SIDE FUNCTION for static pages
 export async function getProductsByCategory_server(categoryId: string): Promise<Product[]> {
+  // Guard against invalid ids that can cause Postgres 22P02 (invalid uuid syntax)
+  if (!categoryId || categoryId === 'undefined') {
+    console.error(`Invalid categoryId provided: ${categoryId}`);
+    return [];
+  }
+
   if (!supabaseService) {
     console.warn("Supabase not configured, using fallback products for category");
     return FALLBACK_PRODUCTS.filter(p => p.category_id === categoryId);
