@@ -7,8 +7,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
+  experimental: {
+    turbopack: false, // Explicitly disable turbopack to force webpack since next-pwa needs it
   },
   images: {
     unoptimized: true,
