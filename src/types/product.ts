@@ -8,4 +8,5 @@ export interface Product {
   ai_hint: string;
   category_id?: string | null;
   stock?: number;
+  is_available?: boolean;
 }
