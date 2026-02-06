@@ -92,6 +92,7 @@ export async function getProducts_client(page: number = 1, pageSize: number = 20
         let query = supabaseClient
             .from('products')
             .select('id, name, price, image, is_available')
+            .eq('is_available', true) // Filter only available products
             .order('created_at', { ascending: false })
             .range(start, end);
 
@@ -125,6 +126,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
         let dbQuery = supabaseClient
             .from('products')
             .select('id, name, price, image, is_available')
+            .eq('is_available', true) // Filter only available products
             .range(0, 19);
 
         // Check if query is numeric (potential barcode)

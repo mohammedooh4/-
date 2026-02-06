@@ -48,6 +48,8 @@ export function ProductCard({ product }: ProductCardProps) {
               alt={product.image_alt}
               data-ai-hint={product.ai_hint}
               fill
+              loading="lazy"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
             />
           </AspectRatio>

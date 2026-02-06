@@ -49,6 +49,7 @@ export async function getProducts_server(): Promise<Product[]> {
   const { data, error } = await supabaseService
     .from('products')
     .select('id, name, price, image, stock, category_id, is_available')
+    .eq('is_available', true) // Filter only available products
     .order('created_at', { ascending: false })
     .range(0, 19);
   if (error) {
@@ -117,6 +118,7 @@ export async function getProductsByCategory_server(categoryId: string): Promise<
     .from('products')
     .select('id, name, price, image, stock, category_id, is_available')
     .eq('category_id', categoryId)
+    .eq('is_available', true) // Filter only available products
     .order('created_at', { ascending: false });
 
   if (error) {
