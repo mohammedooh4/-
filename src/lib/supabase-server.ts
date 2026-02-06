@@ -34,7 +34,8 @@ function mapToProduct(data: any): Product {
     image_alt: data.image_alt || data.name || 'Product image',
     ai_hint: data.ai_hint || '',
     category_id: data.category_id || null,
-    stock: data.stock || 0
+    stock: data.stock || 0,
+    is_available: data.is_available ?? true
   };
 }
 
@@ -47,7 +48,7 @@ export async function getProducts_server(): Promise<Product[]> {
 
   const { data, error } = await supabaseService
     .from('products')
-    .select('id, name, price, image, stock, category_id')
+    .select('id, name, price, image, stock, category_id, is_available')
     .order('created_at', { ascending: false })
     .range(0, 19);
   if (error) {
@@ -114,7 +115,7 @@ export async function getProductsByCategory_server(categoryId: string): Promise<
 
   const { data, error } = await supabaseService
     .from('products')
-    .select('id, name, price, image, stock, category_id')
+    .select('id, name, price, image, stock, category_id, is_available')
     .eq('category_id', categoryId)
     .order('created_at', { ascending: false });
 

@@ -27,7 +27,8 @@ function mapToProduct(data: any): Product {
         image: imageUrl,
         image_alt: data.image_alt || data.name || 'Product image',
         ai_hint: data.ai_hint || '',
-        category_id: data.category_id || null
+        category_id: data.category_id || null,
+        is_available: data.is_available ?? true
     };
 }
 
@@ -90,7 +91,7 @@ export async function getProducts_client(page: number = 1, pageSize: number = 20
     try {
         let query = supabaseClient
             .from('products')
-            .select('id, name, price, image')
+            .select('id, name, price, image, is_available')
             .order('created_at', { ascending: false })
             .range(start, end);
 
@@ -123,7 +124,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
     try {
         let dbQuery = supabaseClient
             .from('products')
-            .select('id, name, price, image')
+            .select('id, name, price, image, is_available')
             .range(0, 19);
 
         // Check if query is numeric (potential barcode)
