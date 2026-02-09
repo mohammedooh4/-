@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
 import { RefreshCw, Loader2, Search, Menu } from 'lucide-react';
+import { LoadingOverlay } from '@/components/loading-overlay';
 import { getProducts_client, searchProducts } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import {
@@ -44,6 +45,7 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isNavigating, setIsNavigating] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
 
     const observerTarget = useRef<HTMLDivElement>(null);
@@ -62,11 +64,12 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
                 try {
                     const parsed = JSON.parse(cachedData);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        console.log("Restoring from cache:", cacheKey, parsed.length);
-                        setProducts(parsed);
+                        // Filter out unavailable products from cache
+                        const availableProducts = parsed.filter((p: any) => p.is_available !== false);
+                        console.log("Restoring from cache:", cacheKey, availableProducts.length);
+                        setProducts(availableProducts);
                         // Approximate page
-                        setPage(Math.ceil(parsed.length / 20));
-                        // If we restored from cache, we might have more data than initial, so we should trust the cache
+                        setPage(Math.ceil(availableProducts.length / 20));
                     }
                 } catch (e) {
                     console.error("Cache parse error", e);
@@ -143,6 +146,15 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
         });
     }, [router, cacheKey, cacheTsKey, initialProducts]);
 
+    // Handle category navigation with loading state
+    const handleCategoryClick = useCallback((path: string) => {
+        setIsNavigating(true);
+        // Clear cache when navigating to ensure fresh data
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(cacheTsKey);
+        router.push(path);
+    }, [router, cacheKey, cacheTsKey]);
+
     const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore || searchQuery) return;
 
@@ -200,123 +212,126 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
 
 
     return (
-        <main className="container mx-auto px-4 py-8 md:py-12">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    {/* Mobile: Sheet for Categories */}
-                    <Sheet>
-                        <SheetTrigger asChild>
-                            <Button variant="outline" size="icon" className="shrink-0 sm:hidden">
-                                <Menu className="h-5 w-5" />
-                                <span className="sr-only">Categories</span>
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="bottom" className="sm:hidden">
-                            <SheetHeader>
-                                <SheetTitle>الفئات</SheetTitle>
-                            </SheetHeader>
-                            <div className="grid gap-2 py-4">
-                                <SheetClose asChild>
-                                    <Button variant="ghost" className="justify-start" onClick={() => router.push('/')}>كل المنتجات</Button>
-                                </SheetClose>
-                                {initialCategories.map((category) => (
-                                    <SheetClose asChild key={category.id}>
-                                        <Button
-                                            variant="ghost"
-                                            className="justify-start gap-2"
-                                            onClick={() => router.push(`/category/${category.id}`)}
-                                        >
-                                            <span dangerouslySetInnerHTML={{ __html: category.icon || '' }} className="[&_svg]:w-4 [&_svg]:h-4" />
-                                            {category.name}
-                                        </Button>
-                                    </SheetClose>
-                                ))}
-                            </div>
-                        </SheetContent>
-                    </Sheet>
-
-                    {/* Desktop: Dropdown menu */}
-                    <div className="hidden sm:block">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="icon" className="shrink-0">
+        <>
+            {isNavigating && <LoadingOverlay message="جاري تحميل الفئة..." />}
+            <main className="container mx-auto px-4 py-8 md:py-12">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        {/* Mobile: Sheet for Categories */}
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button variant="outline" size="icon" className="shrink-0 sm:hidden">
                                     <Menu className="h-5 w-5" />
                                     <span className="sr-only">Categories</span>
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-56">
-                                <DropdownMenuItem
-                                    onSelect={() => router.push('/')}
-                                    className="cursor-pointer"
-                                >
-                                    كل المنتجات
-                                </DropdownMenuItem>
-                                {initialCategories.map(category => (
+                            </SheetTrigger>
+                            <SheetContent side="bottom" className="sm:hidden">
+                                <SheetHeader>
+                                    <SheetTitle>الفئات</SheetTitle>
+                                </SheetHeader>
+                                <div className="grid gap-2 py-4">
+                                    <SheetClose asChild>
+                                        <Button variant="ghost" className="justify-start" onClick={() => handleCategoryClick('/')}>كل المنتجات</Button>
+                                    </SheetClose>
+                                    {initialCategories.map((category) => (
+                                        <SheetClose asChild key={category.id}>
+                                            <Button
+                                                variant="ghost"
+                                                className="justify-start gap-2"
+                                                onClick={() => handleCategoryClick(`/category/${category.id}`)}
+                                            >
+                                                <span dangerouslySetInnerHTML={{ __html: category.icon || '' }} className="[&_svg]:w-4 [&_svg]:h-4" />
+                                                {category.name}
+                                            </Button>
+                                        </SheetClose>
+                                    ))}
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+
+                        {/* Desktop: Dropdown menu */}
+                        <div className="hidden sm:block">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="icon" className="shrink-0">
+                                        <Menu className="h-5 w-5" />
+                                        <span className="sr-only">Categories</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-56">
                                     <DropdownMenuItem
-                                        key={category.id}
-                                        onSelect={() => router.push(`/category/${category.id}`)}
-                                        className="w-full cursor-pointer flex items-center gap-2"
+                                        onSelect={() => handleCategoryClick('/')}
+                                        className="cursor-pointer"
                                     >
-                                        <span dangerouslySetInnerHTML={{ __html: category.icon || '' }} className="[&_svg]:w-4 [&_svg]:h-4" />
-                                        {category.name}
+                                        كل المنتجات
                                     </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                                    {initialCategories.map(category => (
+                                        <DropdownMenuItem
+                                            key={category.id}
+                                            onSelect={() => handleCategoryClick(`/category/${category.id}`)}
+                                            className="w-full cursor-pointer flex items-center gap-2"
+                                        >
+                                            <span dangerouslySetInnerHTML={{ __html: category.icon || '' }} className="[&_svg]:w-4 [&_svg]:h-4" />
+                                            {category.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        {/* Title */}
+                        <h1 className="text-2xl font-bold tracking-tight text-nowrap">
+                            {categoryName || 'اسواق سجاد'}
+                        </h1>
                     </div>
 
-                    {/* Title */}
-                    <h1 className="text-2xl font-bold tracking-tight text-nowrap">
-                        {categoryName || 'اسواق سجاد'}
-                    </h1>
+                    {/* Search Bar */}
+                    <div className="relative w-full md:max-w-md">
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="ابحث عن المنتج"
+                            className="pr-9"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="hidden md:inline-flex"
+                    >
+                        <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </Button>
                 </div>
 
-                {/* Search Bar */}
-                <div className="relative w-full md:max-w-md">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="ابحث عن المنتج"
-                        className="pr-9"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
+                {isSearching ? (
+                    <div className="flex justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                ) : (
+                    <ProductGrid products={products} />
+                )}
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    className="hidden md:inline-flex"
-                >
-                    <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </Button>
-            </div>
-
-            {isSearching ? (
-                <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : (
-                <ProductGrid products={products} />
-            )}
-
-            {/* Infinite Scroll Trigger */}
-            {!searchQuery && hasMore && (
-                <div ref={observerTarget} className="flex justify-center py-8">
-                    {loadingMore ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <div className="h-4" />}
-                </div>
-            )}
-            {!searchQuery && !hasMore && products.length > 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                    وصلت لنهاية المنتجات
-                </div>
-            )}
-            {products.length === 0 && !isSearching && (
-                <div className="text-center py-12 text-muted-foreground">
-                    لا توجد منتجات
-                </div>
-            )}
-        </main>
+                {/* Infinite Scroll Trigger */}
+                {!searchQuery && hasMore && (
+                    <div ref={observerTarget} className="flex justify-center py-8">
+                        {loadingMore ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <div className="h-4" />}
+                    </div>
+                )}
+                {!searchQuery && !hasMore && products.length > 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                        وصلت لنهاية المنتجات
+                    </div>
+                )}
+                {products.length === 0 && !isSearching && (
+                    <div className="text-center py-12 text-muted-foreground">
+                        لا توجد منتجات
+                    </div>
+                )}
+            </main>
+        </>
     );
 }
