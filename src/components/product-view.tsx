@@ -213,7 +213,7 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
 
     return (
         <>
-            {isNavigating && <LoadingOverlay message="جاري تحميل...." />}
+            {isNavigating && <LoadingOverlay message="جاري تحميل..." />}
             <main className="container mx-auto px-4 py-8 md:py-12">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                     <div className="flex items-center gap-4 w-full md:w-auto">
