@@ -8,10 +8,11 @@ import type { Category } from '@/types/category';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-grid';
-import { RefreshCw, Loader2, Search, Menu } from 'lucide-react';
+import { RefreshCw, Loader2, Search, Menu, Store } from 'lucide-react';
 import { LoadingOverlay } from '@/components/loading-overlay';
 import { getProducts_client, searchProducts } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/context/auth-context';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,6 +34,8 @@ const CACHE_DURATION = 15 * 1000; // 15 seconds - shorter for faster updates
 export function ProductView({ initialProducts, initialCategories, activeCategoryId, categoryName }: ProductViewProps) {
     const [isRefreshing, startTransition] = useTransition();
     const router = useRouter();
+    const { user } = useAuth();
+    const displayName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'عزيزي';
 
 
     // Cache Key based on category (or 'home')
@@ -214,105 +217,44 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
     return (
         <>
             {isNavigating && <LoadingOverlay message="جاري تحميل..." />}
-            <main className="container mx-auto px-4 py-8 md:py-12">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        {/* Mobile: Sheet for Categories */}
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button variant="outline" size="icon" className="shrink-0 sm:hidden">
-                                    <Menu className="h-5 w-5" />
-                                    <span className="sr-only">Categories</span>
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent side="bottom" className="sm:hidden">
-                                <SheetHeader>
-                                    <SheetTitle>الفئات</SheetTitle>
-                                </SheetHeader>
-                                <div className="grid gap-2 py-4">
-                                    <SheetClose asChild>
-                                        <Button variant="ghost" className="justify-start" onClick={() => handleCategoryClick('/')}>كل المنتجات</Button>
-                                    </SheetClose>
-                                    {initialCategories.map((category) => (
-                                        <SheetClose asChild key={category.id}>
-                                            <Button
-                                                variant="ghost"
-                                                className="justify-start gap-2"
-                                                onClick={() => handleCategoryClick(`/category/${category.id}`)}
-                                            >
-                                                <span dangerouslySetInnerHTML={{ __html: category.icon || '' }} className="[&_svg]:w-4 [&_svg]:h-4" />
-                                                {category.name}
-                                            </Button>
-                                        </SheetClose>
-                                    ))}
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-
-                        {/* Desktop: Dropdown menu */}
-                        <div className="hidden sm:block">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon" className="shrink-0">
-                                        <Menu className="h-5 w-5" />
-                                        <span className="sr-only">Categories</span>
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" className="w-56">
-                                    <DropdownMenuItem
-                                        onSelect={() => handleCategoryClick('/')}
-                                        className="cursor-pointer"
-                                    >
-                                        كل المنتجات
-                                    </DropdownMenuItem>
-                                    {initialCategories.map(category => (
-                                        <DropdownMenuItem
-                                            key={category.id}
-                                            onSelect={() => handleCategoryClick(`/category/${category.id}`)}
-                                            className="w-full cursor-pointer flex items-center gap-2"
-                                        >
-                                            <span dangerouslySetInnerHTML={{ __html: category.icon || '' }} className="[&_svg]:w-4 [&_svg]:h-4" />
-                                            {category.name}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+            <main className="container mx-auto px-4 py-8 md:py-12 pb-24">
+                {/* Header Section */}
+                <div className="flex flex-col gap-6 mb-8">
+                    {/* Top Row: Greeting */}
+                    <div className="flex justify-between items-center">
+                        <div className="flex flex-col">
+                            <span className="text-muted-foreground text-sm">مرحباً,</span>
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                                {displayName}
+                            </h1>
                         </div>
-
-                        {/* Title */}
-                        <h1 className="text-2xl font-bold tracking-tight text-nowrap">
-                            {categoryName || 'اسواق سجاد'}
-                        </h1>
+                        <div className="flex-shrink-0 w-14 h-14 bg-primary text-primary-foreground rounded-2xl shadow-lg ring-4 ring-primary/10 flex items-center justify-center">
+                            <Store className="h-8 w-8" />
+                        </div>
                     </div>
 
                     {/* Search Bar */}
-                    <div className="relative w-full md:max-w-md">
-                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <div className="relative w-full">
+                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input
-                            placeholder="ابحث عن المنتج"
-                            className="pr-9"
+                            placeholder="ماذا تريد أن تطلب اليوم؟"
+                            className="pr-12 h-14 rounded-2xl bg-white dark:bg-zinc-900 border-none shadow-sm text-base"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleRefresh}
-                        disabled={isRefreshing}
-                        className="hidden md:inline-flex"
-                    >
-                        <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </Button>
+                    {/* Categories Section */}
+
                 </div>
 
+                {/* Product Grid */}
                 {isSearching ? (
                     <div className="flex justify-center py-12">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                 ) : (
-                    <ProductGrid products={products} />
+                    <ProductGrid products={products} categories={initialCategories} />
                 )}
 
                 {/* Infinite Scroll Trigger */}

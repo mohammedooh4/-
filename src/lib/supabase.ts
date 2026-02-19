@@ -1,7 +1,8 @@
 
 import { createClient as createBrowserClient } from '@supabase/supabase-js';
 import type { Product } from '@/types/product';
-import { FALLBACK_PRODUCTS, isSupabaseConfigured } from './fallback-data';
+import type { Category } from '@/types/category';
+import { FALLBACK_PRODUCTS, FALLBACK_CATEGORIES, isSupabaseConfigured } from './fallback-data';
 
 // --- Client-side Supabase Client (uses anon key) ---
 // This is safe to expose in the browser.
@@ -20,15 +21,15 @@ function mapToProduct(data: any): Product {
     }
 
     return {
-        id: String(data.id),
-        name: data.name || '',
-        price: data.price || 0,
+        id: String(data.id || ''),
+        name: data.name || 'منتج غير معروف',
+        price: Number(data.price) || 0,
         description: data.description || '',
         image: imageUrl,
-        image_alt: data.image_alt || data.name || 'Product image',
+        image_alt: data.image_alt || data.name || 'صورة المنتج',
         ai_hint: data.ai_hint || '',
-        category_id: data.category_id || null,
-        is_available: data.is_available ?? true
+        category_id: String(data.category_id || ''),
+        is_available: Boolean(data.is_available ?? true)
     };
 }
 
@@ -49,7 +50,14 @@ export async function getProductById_client(id: string): Promise<Product | undef
         if (error) {
             // Check for specific "Row not found" error code (PGRST116)
             if (error.code === 'PGRST116') {
-                return undefined;
+                console.warn(`Product ${id} not found in database, checking fallback`);
+                return FALLBACK_PRODUCTS.find(p => p.id === id);
+            }
+
+            // Suppress error if the error object is empty (often happens with network glitches or weird states)
+            if (Object.keys(error).length === 0) {
+                console.warn(`Empty error fetching product ${id} from Supabase. Treating as not found.`);
+                return FALLBACK_PRODUCTS.find(p => p.id === id);
             }
 
             console.error(`Error fetching product ${id} from Supabase:`, error);
@@ -61,7 +69,8 @@ export async function getProductById_client(id: string): Promise<Product | undef
             return mapToProduct(data);
         }
 
-        return undefined;
+        console.warn(`Product ${id} not found, checking fallback`);
+        return FALLBACK_PRODUCTS.find(p => p.id === id);
 
     } catch (e) {
         console.error(`Exception fetching product by id ${id}: `, e);
@@ -91,7 +100,7 @@ export async function getProducts_client(page: number = 1, pageSize: number = 20
     try {
         let query = supabaseClient
             .from('products')
-            .select('id, name, price, image, is_available')
+            .select('*') // Get all fields including description
             .eq('is_available', true) // Filter only available products
             .order('created_at', { ascending: false })
             .range(start, end);
@@ -107,7 +116,11 @@ export async function getProducts_client(page: number = 1, pageSize: number = 20
             // Fallback for errors
             const start = (page - 1) * pageSize;
             const end = start + pageSize;
-            return FALLBACK_PRODUCTS.slice(start, end);
+            let results = FALLBACK_PRODUCTS;
+            if (categoryId) {
+                results = results.filter(p => p.category_id === categoryId);
+            }
+            return results.slice(start, end);
         }
 
         return (data || []).map(mapToProduct);
@@ -176,3 +189,61 @@ export async function getLatestOrderStatusByUserId(userId: string): Promise<stri
 
     return data.status;
 }
+
+// CLIENT-SIDE FUNCTION: fetch all categories
+export async function getCategories_client(): Promise<Category[]> {
+    if (!supabaseClient) {
+        console.warn("Supabase not configured, using fallback categories");
+        return FALLBACK_CATEGORIES;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('categories')
+            .select('id, name');
+
+        if (error) {
+            console.error("Error fetching categories:", error);
+            return FALLBACK_CATEGORIES;
+        }
+
+        return data || [];
+    } catch (e) {
+        console.error("Exception fetching categories:", e);
+        return FALLBACK_CATEGORIES;
+    }
+}
+
+// CLIENT-SIDE FUNCTION: fetch products by category with pagination
+export async function getProductsByCategory_client(categoryId: string, page: number = 1, pageSize: number = 20): Promise<Product[]> {
+    if (!supabaseClient) {
+        console.warn("Supabase not configured, using fallback products for category");
+        const filtered = FALLBACK_PRODUCTS.filter(p => p.category_id === categoryId);
+        const start = (page - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('products')
+            .select('id, name, price, image, stock, category_id, is_available')
+            .eq('category_id', categoryId)
+            .eq('is_available', true)
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (error) {
+            console.error(`Error fetching products for category ${categoryId}:`, error);
+            return [];
+        }
+
+        return (data || []).map(mapToProduct);
+    } catch (e) {
+        console.error(`Exception fetching products for category ${categoryId}:`, e);
+        return [];
+    }
+}
+

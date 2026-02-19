@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { initPushNotifications } from '@/lib/push-notifications';
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
@@ -55,53 +56,51 @@ export default function SignupPage() {
 
     const { data, error } = result;
 
-    if (error || (data.user && data.user.identities?.length === 0)) {
-      console.warn("Supabase signup failed/exists, falling back to mock auth:", error?.message);
-
-      // Mock User Creation
-      const mockUser = {
-        id: crypto.randomUUID(),
-        email: isPhone ? undefined : input,
-        phone: isPhone ? input : undefined,
-        password: password, // Store password for mock auth check
-        user_metadata: { full_name: fullName },
-        created_at: new Date().toISOString(),
-        aud: 'authenticated',
-        role: 'authenticated',
-        app_metadata: { provider: isPhone ? 'phone' : 'email' },
-      };
-
-      // Save to local "database" of users
-      const storedUsers = localStorage.getItem('mock_users_db');
-      const usersDb = storedUsers ? JSON.parse(storedUsers) : [];
-
-      // Remove password from session object but keep in DB
-      const sessionUser = { ...mockUser };
-      delete (sessionUser as any).password;
-
-      usersDb.push(mockUser);
-      localStorage.setItem('mock_users_db', JSON.stringify(usersDb));
-
-      // Set current session
-      localStorage.setItem('mock_user', JSON.stringify(sessionUser));
-
+    if (error) {
+      console.error("Supabase signup failed:", error.message);
       toast({
-        title: "تم إنشاء الحساب",
-        description: "تم إنشاء حسابك وتسجيل الدخول (وضع محاكاة).",
+        variant: "destructive",
+        title: "خطأ في إنشاء الحساب",
+        description: error.message === "User already registered"
+          ? "هذا الحساب مسجّل مسبقاً. جرّب تسجيل الدخول بدلاً من ذلك."
+          : `حدث خطأ: ${error.message}`,
       });
+      setLoading(false);
+      return;
+    }
 
-      // استخدم التوجيه الخاص بـ Next لتفادي net::ERR_ABORTED
-      router.replace('/');
+    // User already exists (identities is empty)
+    if (data.user && data.user.identities?.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "الحساب موجود مسبقاً",
+        description: "هذا البريد الإلكتروني أو رقم الهاتف مسجّل بالفعل. جرّب تسجيل الدخول.",
+      });
+      setLoading(false);
       return;
     }
 
     setLoading(false);
 
-    // Success path (real auth)
-    if (data.user) {
+    // Success path (real auth) — user is already authenticated with a session
+    if (data.user && data.session) {
+      // Register push notifications
+      console.log('Signup success, initializing push notifications for:', data.user.id);
+      setTimeout(() => {
+        initPushNotifications(data.user!.id);
+      }, 1000);
+
       toast({
         title: "✅ تم الإنشاء بنجاح",
-        description: isPhone ? "تم إنشاء حسابك برقم الهاتف." : "تم إنشاء حسابك. يرجى التحقق من بريدك الإلكتروني.",
+        description: "تم إنشاء حسابك وتسجيل الدخول بنجاح.",
+      });
+      router.replace('/');
+      router.refresh();
+    } else if (data.user && !data.session) {
+      // Email confirmation required
+      toast({
+        title: "✅ تم الإنشاء بنجاح",
+        description: "تم إنشاء حسابك. يرجى التحقق من بريدك الإلكتروني ثم تسجيل الدخول.",
       });
       router.push('/login');
     }

@@ -1,82 +1,121 @@
-"use client"
+"use client";
 
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { supabaseClient } from '@/lib/supabase';
-import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import type { User } from "@supabase/supabase-js";
+import { supabaseClient } from "@/lib/supabase";
+import { initPushNotifications, removePushNotificationToken, showInAppNotification } from "@/lib/push-notifications";
+
+const statusLabels: Record<string, string> = {
+    pending: 'في الانتظار',
+    confirmed: 'مؤكد',
+    preparing: 'قيد التحضير',
+    ready: 'جاهز للاستلام',
+    delivered: 'تم التسليم',
+    cancelled: 'ملغى',
+};
 
 interface AuthContextType {
-  user: User | null;
-  loading: boolean;
+    user: User | null;
+    loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+    user: null,
+    loading: true,
+});
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }: { children: ReactNode }) {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check for mock user in localStorage first (or if Supabase is missing)
-    const checkUser = () => {
-      const mockUserStr = typeof window !== 'undefined' ? localStorage.getItem('mock_user') : null;
-      if (mockUserStr) {
-        try {
-          const mockUser = JSON.parse(mockUserStr);
-          setUser(mockUser as User);
-          setLoading(false);
-          return; // Stop here if we have a mock user
-        } catch (e) {
-          console.error("Failed to parse mock user", e);
+    useEffect(() => {
+
+        if (!supabaseClient) {
+            setLoading(false);
+            return;
         }
-      }
 
-      if (!supabaseClient) {
-        setLoading(false);
-        return;
-      }
+        // Get initial session
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+            setLoading(false);
 
-      // onAuthStateChange is the single source of truth.
-      // It fires once on initial load, and again whenever the auth state changes.
-      const { data: authListener } = supabaseClient.auth.onAuthStateChange(
-        (event: AuthChangeEvent, session: Session | null) => {
-          // If we have a real session, prefer it.
-          if (session?.user) {
-            setUser(session.user);
-          } else {
-            // If no real session, check logic again or keep null (unless we want to persist mock check)
-            // For simplicity, if Supabase says null, we revert to null OR check mock again?
-            // Let's re-check mock user to be safe if user considers themselves logged in via mock
-            const currentMock = typeof window !== 'undefined' ? localStorage.getItem('mock_user') : null;
-            if (currentMock) {
-              setUser(JSON.parse(currentMock));
-            } else {
-              setUser(null);
+            // Initialize push notifications if user is logged in
+            if (session?.user) {
+                initPushNotifications(session.user.id);
             }
-          }
-          setLoading(false);
-        }
-      );
+        });
 
-      return () => {
-        authListener?.subscription.unsubscribe();
-      };
-    };
+        // Listen for auth changes
+        const {
+            data: { subscription },
+        } = supabaseClient.auth.onAuthStateChange((event, session) => {
+            console.log('Auth state change event:', event);
+            setUser(session?.user ?? null);
+            setLoading(false);
 
-    checkUser();
-  }, []);
+            // Initialize/re-initialize push notifications on login or initial session
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+                console.log('Initializing push notifications for user:', session.user.id);
+                initPushNotifications(session.user.id);
+            }
 
-  const value = {
-    user,
-    loading,
-  };
+            // Cleanup on logout
+            if (event === 'SIGNED_OUT') {
+                removePushNotificationToken();
+            }
+        });
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+    // Supabase Realtime: Listen for order status changes
+    useEffect(() => {
+        if (!supabaseClient || !user) return;
+
+        const channel = supabaseClient
+            .channel('order-status-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                    const newStatus = payload.new?.status;
+                    const oldStatus = payload.old?.status;
+
+                    // Only show notification when status actually changed
+                    if (newStatus && newStatus !== oldStatus) {
+                        const statusLabel = statusLabels[newStatus] || newStatus;
+                        const orderId = (payload.new?.id || '').slice(0, 8);
+
+                        showInAppNotification(
+                            `📦 تحديث طلبك #${orderId}`,
+                            `حالة طلبك تغيرت إلى: ${statusLabel}`,
+                            'order'
+                        );
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabaseClient?.removeChannel(channel);
+        };
+    }, [user]);
+
+    return (
+        <AuthContext.Provider value={{ user, loading }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
+export function useAuth() {
+    return useContext(AuthContext);
+}

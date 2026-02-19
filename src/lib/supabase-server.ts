@@ -90,7 +90,7 @@ export async function getCategoryById_server(categoryId: string): Promise<Catego
 
   const { data, error } = await supabaseService
     .from('categories')
-    .select('id, name, icon')
+    .select('id, name')
     .eq('id', categoryId)
     .maybeSingle();
 

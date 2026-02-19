@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { initPushNotifications } from '@/lib/push-notifications';
 
 export default function LoginPage() {
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -60,58 +61,37 @@ export default function LoginPage() {
       });
     }
 
-    const { error } = await authPromise;
+    const { data, error } = await authPromise;
 
     if (error) {
-      console.warn("Supabase auth failed, falling back to mock auth:", error.message);
-
-      // Fallback to Mock Auth: CHECK LOCAL DB
-      const storedUsers = localStorage.getItem('mock_users_db');
-      const usersDb = storedUsers ? JSON.parse(storedUsers) : [];
-
-      const foundUser = usersDb.find((u: any) => {
-        const matches = isPhone ? (u.phone === input) : (u.email === input);
-        return matches && u.password === password;
+      console.error("Supabase auth failed:", error.message);
+      toast({
+        variant: "destructive",
+        title: "خطأ في تسجيل الدخول",
+        description: error.message === "Invalid login credentials"
+          ? "بيانات الدخول غير صحيحة. تأكد من البريد/الهاتف وكلمة المرور."
+          : `حدث خطأ: ${error.message}`,
       });
-
-      if (foundUser) {
-        // Verify success
-        console.log("Mock login successful");
-        const sessionUser = { ...foundUser };
-        delete sessionUser.password;
-
-        localStorage.setItem('mock_user', JSON.stringify(sessionUser));
-
-        toast({
-          title: "تم تسجيل الدخول",
-          description: `مرحباً بك، ${foundUser.user_metadata?.full_name || 'زائر'} (وضع محاكاة)`,
-        });
-
-        // استخدم التوجيه الخاص بـ Next لتجنّب net::ERR_ABORTED
-        router.replace('/');
-        return;
-      } else {
-        // Verify Failed
-        toast({
-          variant: "destructive",
-          title: "خطأ في تسجيل الدخول",
-          description: "بيانات الدخول غير صحيحة أو الحساب غير موجود (تأكد من إنشاء حساب أولاً).",
-        });
-        setLoading(false);
-        return;
-      }
+      setLoading(false);
       return;
     }
 
-    setLoading(false);
-    if (!error) {
-      toast({
-        title: "تم بنجاح",
-        description: "تم تسجيل دخولك بنجاح.",
-      });
-      router.push('/');
-      router.refresh();
+    // Supabase login success — register push notifications
+    if (data?.user) {
+      console.log('Login success, initializing push notifications for:', data.user.id);
+      // Use setTimeout to give the Capacitor bridge a moment
+      setTimeout(() => {
+        initPushNotifications(data.user!.id);
+      }, 1000);
     }
+
+    setLoading(false);
+    toast({
+      title: "تم بنجاح",
+      description: "تم تسجيل دخولك بنجاح.",
+    });
+    router.replace('/');
+    router.refresh();
   };
 
   return (

@@ -31,6 +31,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
   return (
     <html lang="ar" dir="rtl">
       <head>
@@ -54,3 +55,4 @@ export default function RootLayout({
     </html>
   );
 }
+

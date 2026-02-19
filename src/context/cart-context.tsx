@@ -18,8 +18,8 @@ export interface CartItem extends Product {
 interface CartContextType {
   cartItems: CartItem[];
   addToCart: (product: Product) => void;
-  removeFromCart: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
+  removeFromCart: (productId: string | number) => void;
+  updateQuantity: (productId: string | number, quantity: number) => void;
   clearCart: () => void;
   totalPrice: number;
   totalItems: number;
@@ -47,7 +47,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   }, []);
-  
+
   // 2. Fetch product details based on stored IDs
   useEffect(() => {
     const fetchCartDetails = async () => {
@@ -56,13 +56,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
         return;
       }
-      
+
       setIsLoading(true);
       const detailedItems: CartItem[] = [];
       for (const item of storedItems) {
-        // Ensure the ID is a number before fetching
-        const productId = typeof item.id === 'string' ? parseInt(item.id, 10) : item.id;
-        if (isNaN(productId)) continue;
+        // Ensure the ID is a string for fetching
+        const productId = String(item.id);
 
         const product = await getProductById_client(productId);
         if (product) {
@@ -80,36 +79,36 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   // 3. Update localStorage whenever storedItems change
   useEffect(() => {
     try {
-        const storableCart = cartItems.map(item => ({ id: item.id, quantity: item.quantity }));
-        localStorage.setItem('cart', JSON.stringify(storableCart));
+      const storableCart = cartItems.map(item => ({ id: item.id, quantity: item.quantity }));
+      localStorage.setItem('cart', JSON.stringify(storableCart));
     } catch (error) {
-        console.error("Could not save cart to localStorage", error);
+      console.error("Could not save cart to localStorage", error);
     }
   }, [cartItems]);
 
   const addToCart = (product: Product) => {
     setCartItems(prevItems => {
-      const existingItem = prevItems.find(item => item.id === product.id);
+      const existingItem = prevItems.find(item => String(item.id) === String(product.id));
       if (existingItem) {
         return prevItems.map(item =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          String(item.id) === String(product.id) ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
       return [...prevItems, { ...product, quantity: 1 }];
     });
   };
 
-  const removeFromCart = (productId: number) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
+  const removeFromCart = (productId: string | number) => {
+    setCartItems(prevItems => prevItems.filter(item => String(item.id) !== String(productId)));
   };
 
-  const updateQuantity = (productId: number, quantity: number) => {
+  const updateQuantity = (productId: string | number, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(productId);
     } else {
       setCartItems(prevItems =>
         prevItems.map(item =>
-          item.id === productId ? { ...item, quantity } : item
+          String(item.id) === String(productId) ? { ...item, quantity } : item
         )
       );
     }
