@@ -1,5 +1,5 @@
 {
-  "name": "nextn",
+  "name": "اسواق سجاد",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -24,6 +24,7 @@
     "@capacitor/core": "^6.1.0",
     "@capacitor/haptics": "^6.0.2",
     "@capacitor/ios": "^6.1.0",
+    "@capacitor/push-notifications": "^6.0.5",
     "@capacitor/splash-screen": "^6.0.3",
     "@capacitor/status-bar": "^6.0.2",
     "@genkit-ai/googleai": "^1.14.1",
@@ -68,6 +69,7 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
+    "react-qr-code": "^2.0.18",
     "react-window": "^2.2.6",
     "react-window-infinite-loader": "^2.0.1",
     "recharts": "^2.15.1",

@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   experimental: {
     turbopack: false, // Explicitly disable turbopack to force webpack since next-pwa needs it
   },
+  output: 'export',
   images: {
     unoptimized: true,
     remotePatterns: [
