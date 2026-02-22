@@ -15,7 +15,7 @@
     "capacitor:open:android": "capacitor open android",
     "capacitor:build:android": "capacitor build android",
     "capacitor:run:android": "capacitor run android",
-    "mobile:build": "npm run build && npm run capacitor:copy && npm run capacitor:sync",
+    "mobile:build": "set MOBILE_BUILD=true&& npm run build && npm run capacitor:copy && npm run capacitor:sync",
     "mobile:android": "npm run mobile:build && npm run capacitor:run:android"
   },
   "dependencies": {
@@ -59,7 +59,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
-    "firebase": "^10.12.3",
+    "firebase": "^10.14.1",
     "genkit": "^1.14.1",
     "lucide-react": "^0.475.0",
     "next": "^16.1.6",
@@ -73,9 +73,11 @@
     "react-window": "^2.2.6",
     "react-window-infinite-loader": "^2.0.1",
     "recharts": "^2.15.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.0",
