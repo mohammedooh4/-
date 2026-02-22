@@ -29,7 +29,8 @@ function mapToProduct(data: any): Product {
         image_alt: data.image_alt || data.name || 'صورة المنتج',
         ai_hint: data.ai_hint || '',
         category_id: String(data.category_id || ''),
-        is_available: Boolean(data.is_available ?? true)
+        is_available: Boolean(data.is_available ?? true),
+        options: Array.isArray(data.options) && data.options.length > 0 ? data.options : undefined
     };
 }
 

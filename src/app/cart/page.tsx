@@ -55,6 +55,7 @@ async function createOrder(cartItems: CartItem[], totalPrice: number, user: User
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,
+        selected_option: item.selectedOption || null
       }));
 
       const { error: itemsError } = await supabaseClient!
@@ -121,6 +122,7 @@ async function createOrder(cartItems: CartItem[], totalPrice: number, user: User
     quantity: item.quantity,
     unit_price: item.price,
     total_price: item.price * item.quantity,
+    selected_option: item.selectedOption || null
   }));
 
   const { error: itemsError } = await supabaseClient!
@@ -148,12 +150,24 @@ export default function CartPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
 
+  // Load saved phone number (localStorage first, then user metadata)
   useEffect(() => {
-    if (user) {
+    const savedPhone = localStorage.getItem('contactPhone');
+    if (savedPhone) {
+      setContactPhone(savedPhone);
+    } else if (user) {
       const phone = user.phone || user.user_metadata?.phone || '';
       if (phone) setContactPhone(phone);
     }
   }, [user]);
+
+  // Save phone to localStorage whenever user changes it
+  const handlePhoneChange = (value: string) => {
+    setContactPhone(value);
+    if (value.trim()) {
+      localStorage.setItem('contactPhone', value);
+    }
+  };
 
   useEffect(() => {
     const checkOrdersExistence = async () => {
@@ -212,7 +226,7 @@ export default function CartPage() {
 
     try {
       console.log('Attempting to fetch order items for order:', orderId);
-      
+
       // Check if supabase client is available
       if (!supabaseClient) {
         console.error('Supabase client not available');
@@ -250,14 +264,14 @@ export default function CartPage() {
           hint: error.hint,
           code: error.code
         });
-        
+
         // Handle empty error object
-        const errorMessage = error.message || 
-                          error.details || 
-                          error.hint || 
-                          (error.code && `خطأ في قاعدة البيانات: ${error.code}`) ||
-                          'حدث خطأ غير معروف في جلب تفاصيل الطلب';
-        
+        const errorMessage = error.message ||
+          error.details ||
+          error.hint ||
+          (error.code && `خطأ في قاعدة البيانات: ${error.code}`) ||
+          'حدث خطأ غير معروف في جلب تفاصيل الطلب';
+
         toast({
           variant: "destructive",
           title: "خطأ في جلب تفاصيل الطلب",
@@ -311,13 +325,13 @@ export default function CartPage() {
 
       // Clear existing cart and add new items
       localStorage.setItem('cartItems', JSON.stringify([]));
-      
+
       // Add items back to cart using cart context format
       const newCartItems = cartItemsToAdd.map(item => ({
         id: item.id,
         quantity: item.quantity
       }));
-      
+
       localStorage.setItem('cartItems', JSON.stringify(newCartItems));
 
       // Remove order from active orders
@@ -463,7 +477,7 @@ export default function CartPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="w-full space-y-3">
                   <div className="bg-white dark:bg-zinc-800 p-4 rounded-xl border">
                     <div className="space-y-2">
@@ -545,7 +559,10 @@ export default function CartPage() {
                           />
                         </div>
                         <div className="flex-grow min-w-0">
-                          <h3 className="font-bold text-xs md:text-sm truncate">{item.name}</h3>
+                          <h3 className="font-bold text-xs md:text-sm truncate">
+                            {item.name}
+                            {item.selectedOption && <span className="text-primary mr-1">({item.selectedOption})</span>}
+                          </h3>
                           <p className="text-primary font-bold text-sm md:text-base">
                             {item.price.toLocaleString('ar-IQ', { style: 'currency', currency: 'IQD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </p>
@@ -609,7 +626,10 @@ export default function CartPage() {
                         </div>
 
                         <div className="flex-grow flex flex-col gap-2 w-full text-center sm:text-right">
-                          <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-gray-100 line-clamp-1">{item.name}</h3>
+                          <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-gray-100 line-clamp-1">
+                            {item.name}
+                            {item.selectedOption && <span className="text-primary mr-1">({item.selectedOption})</span>}
+                          </h3>
                           <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">{item.description}</p>
                           <p className="font-bold text-base md:text-lg text-primary">
                             {item.price.toLocaleString('ar-IQ', { style: 'currency', currency: 'IQD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -655,19 +675,12 @@ export default function CartPage() {
                     <span>عدد المنتجات</span>
                     <span>{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
                   </div>
-                  <div className="flex justify-between text-gray-500 text-sm md:text-base">
-                    <span>الشحن</span>
-                    <span className="text-green-600 font-medium">مجاني</span>
-                  </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between items-end">
                     <span className="font-bold text-base md:text-lg">المجموع الكلي</span>
-                    <div className="text-right">
-                      <span className="block font-bold text-lg md:text-2xl text-primary">
-                        {totalPrice.toLocaleString('ar-IQ', { style: 'currency', currency: 'IQD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </span>
-                      <span className="text-xs text-gray-400">شامل الضريبة</span>
-                    </div>
+                    <span className="font-bold text-lg md:text-2xl text-primary">
+                      {totalPrice.toLocaleString('ar-IQ', { style: 'currency', currency: 'IQD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </span>
                   </div>
                 </div>
 
@@ -679,7 +692,7 @@ export default function CartPage() {
                         id="phone"
                         placeholder="780 123 4567"
                         value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
                         className="pl-12 rounded-xl h-10 md:h-12 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-sm md:text-base"
                         dir="ltr"
                       />

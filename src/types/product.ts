@@ -9,4 +9,5 @@ export interface Product {
   category_id?: string | null;
   stock?: number;
   is_available?: boolean;
+  options?: string[];
 }

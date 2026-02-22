@@ -5,14 +5,15 @@ import { CartProvider } from '@/context/cart-context';
 import { AuthProvider } from '@/context/auth-context';
 import { BottomNavBar } from '@/components/bottom-nav-bar';
 import { MobileLayout } from '@/components/mobile-layout';
-import { Tajawal } from 'next/font/google';
 import { cn } from '@/lib/utils';
 
-const tajawal = Tajawal({
-  subsets: ['arabic'],
-  weight: ['400', '500', '700', '800'],
-  variable: '--font-tajawal',
-});
+// Using system fonts instead of Google Fonts to avoid network issues
+const systemFonts = {
+  className: 'font-sans',
+  style: {
+    fontFamily: '"Tajawal", "Noto Sans Arabic", "Arial", sans-serif',
+  },
+};
 
 
 export const metadata: Metadata = {
@@ -35,13 +36,35 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
-        <meta name="theme-color" content="#598cfa" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="theme-color" content="#000000" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className={cn("font-body antialiased pb-20", tajawal.variable)}>
+      <body className={cn("font-body antialiased pb-20", systemFonts.className)} style={systemFonts.style}>
+        {/* Disable Service Worker on Native Capacitor Platforms to prevent white screen caching issues */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform()) {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                      // Don't unregister our manual firebase-messaging-sw.js
+                      if (!registration.active || !registration.active.scriptURL.includes('firebase-messaging-sw.js')) {
+                        registration.unregister();
+                        console.log('Unregistered PWA service worker on native platform');
+                      }
+                    }
+                  });
+                }
+              }
+            `,
+          }}
+        />
         <AuthProvider>
           <CartProvider>
             <MobileLayout>

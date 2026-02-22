@@ -35,7 +35,8 @@ function mapToProduct(data: any): Product {
     ai_hint: data.ai_hint || '',
     category_id: data.category_id || null,
     stock: data.stock || 0,
-    is_available: data.is_available ?? true
+    is_available: data.is_available ?? true,
+    options: Array.isArray(data.options) && data.options.length > 0 ? data.options : undefined
   };
 }
 

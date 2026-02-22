@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from 'react';
+
 import type { Product } from '@/types/product';
 import { ProductImageZoom } from '@/components/product-image-zoom';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,8 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
   const { toast } = useToast();
   const isUnavailable = product.is_available === false;
 
+  const [selectedOption, setSelectedOption] = useState<string | undefined>(undefined);
+
   const handleAddToCart = () => {
     if (isUnavailable) {
       toast({
@@ -26,10 +30,24 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
       });
       return;
     }
-    addToCart(product);
+
+    if (product.options && product.options.length > 0 && !selectedOption) {
+      toast({
+        title: "يرجى اختيار النوع",
+        description: "يجب اختيار نوع المنتج قبل إضافته للسلة.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addToCart(product, selectedOption);
+
+    // Reset selection after adding to cart
+    setSelectedOption(undefined);
+
     toast({
       title: "✅ تمت الإضافة إلى السلة",
-      description: `"${product.name}" أصبح الآن في سلتك.`,
+      description: `"${product.name}${selectedOption ? ` - ${selectedOption}` : ''}" أصبح الآن في سلتك.`,
     });
   };
 
@@ -49,6 +67,28 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         )}
 
         <Separator className="my-4" />
+
+        {product.options && product.options.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-semibold text-lg mb-3">اختر النوع:</h3>
+            <div className="flex flex-wrap gap-2">
+              {product.options.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setSelectedOption(option)}
+                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer ${selectedOption === option
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                    : 'bg-background hover:bg-muted border-input'
+                    }`}
+                  disabled={isUnavailable}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="prose prose-lg text-foreground max-w-none">
           <h2 className="font-semibold text-xl mb-2">الوصف</h2>
           <p className="text-muted-foreground">{product.description}</p>
@@ -56,12 +96,19 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         <div className="mt-auto pt-8">
           <Button
             size="lg"
-            className={`w-full text-lg py-6 ${isUnavailable ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed' : 'bg-accent hover:bg-accent/90 text-accent-foreground'}`}
+            className={`w-full text-lg py-6 ${isUnavailable || (product.options && product.options.length > 0 && !selectedOption)
+              ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed opacity-80'
+              : 'bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg transition-all'
+              }`}
             onClick={handleAddToCart}
-            disabled={isUnavailable}
+            disabled={isUnavailable || (Boolean(product.options?.length) && !selectedOption)}
           >
             <ShoppingCart className="ml-3 h-6 w-6" />
-            {isUnavailable ? 'غير متوفر' : 'أضف إلى السلة'}
+            {isUnavailable
+              ? 'غير متوفر'
+              : (product.options && product.options.length > 0 && !selectedOption)
+                ? 'الرجاء اختيار النوع'
+                : 'أضف إلى السلة'}
           </Button>
         </div>
       </div>

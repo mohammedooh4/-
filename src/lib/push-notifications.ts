@@ -13,6 +13,9 @@ function isNativePlatform(): boolean {
     }
 }
 
+// Guard to prevent double web push initialization
+let webPushInitialized = false;
+
 /**
  * Initialize push notifications on native platforms.
  * Call this after user login.
@@ -22,11 +25,19 @@ export async function initPushNotifications(userId: string) {
     console.log('Push notifications: initPushNotifications called for user:', userId);
     console.log('Push notifications: Platform:', Capacitor.getPlatform(), 'isNative:', isNativePlatform());
 
-    if (!isNativePlatform()) {
-        console.log('Push notifications: Not a native platform, skipping');
-        return;
+    if (isNativePlatform()) {
+        // Native platform (Android/iOS) - use Capacitor
+        await initNativePushNotifications(userId);
+    } else {
+        // Web platform - use Firebase Cloud Messaging
+        await initWebPushNotifications(userId);
     }
+}
 
+/**
+ * Initialize push notifications on native Capacitor platforms (Android/iOS)
+ */
+async function initNativePushNotifications(userId: string) {
     try {
         const { PushNotifications } = await import('@capacitor/push-notifications');
 
@@ -55,7 +66,19 @@ export async function initPushNotifications(userId: string) {
                 lights: true,
                 lightColor: '#598cfa',
             });
-            
+
+            // Create the custom sound channel specifically for order status updates
+            await PushNotifications.createChannel({
+                id: 'orders_sound_channel',
+                name: 'تحديثات الطلبات بصوت مميز',
+                description: 'إشعارات مخصصة للطلبات بصوت تفاعلي',
+                importance: 5,
+                visibility: 1,
+                sound: 'mixkit_software_interface_start_2574',
+                vibration: true,
+                lights: true,
+            });
+
             // Create additional channels for different notification types
             await PushNotifications.createChannel({
                 id: 'general_channel',
@@ -84,7 +107,7 @@ export async function initPushNotifications(userId: string) {
         // so the OS will also show a standard system notification.
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
             console.log('Push notification received (foreground):', notification);
-            
+
             // Always show in-app banner for better UX when app is in foreground
             // Determine notification type
             const notifType = notification.data?.type === 'new_product' ? 'product'
@@ -122,34 +145,249 @@ export async function initPushNotifications(userId: string) {
 }
 
 /**
+ * Initialize push notifications on Web using Firebase Cloud Messaging
+ */
+async function initWebPushNotifications(userId: string) {
+    if (typeof window === 'undefined') return;
+
+    // Prevent duplicate initialization
+    if (webPushInitialized) {
+        console.log('Web Push: Already initialized, skipping duplicate init');
+        return;
+    }
+    webPushInitialized = true;
+
+    try {
+        console.log('Web Push: Initializing Firebase Cloud Messaging...');
+
+        // Check if Notification API is available
+        if (!('Notification' in window)) {
+            console.warn('Web Push: Notifications not supported in this browser');
+            return;
+        }
+
+        // Check if service workers are supported
+        if (!('serviceWorker' in navigator)) {
+            console.warn('Web Push: Service workers not supported');
+            return;
+        }
+
+        // Request notification permission first
+        const permission = await Notification.requestPermission();
+        console.log('Web Push: Notification permission:', permission);
+
+        if (permission !== 'granted') {
+            console.warn('Web Push: Notification permission not granted');
+            return;
+        }
+
+        // Register the Firebase messaging service worker
+        let swRegistration: ServiceWorkerRegistration | null = null;
+        try {
+            swRegistration = await registerFirebaseServiceWorker();
+        } catch (swError) {
+            console.warn('Web Push: Service worker registration failed:', swError);
+            return;
+        }
+
+        if (!swRegistration) {
+            console.warn('Web Push: Service worker registration returned null');
+            return;
+        }
+
+        // Dynamic import to avoid SSR issues
+        console.log('Web Push: Importing Firebase modules...');
+        const { getFirebaseMessaging, getToken, onMessage } = await import('./firebase-config');
+        console.log('Web Push: Firebase modules imported successfully');
+
+        console.log('Web Push: Getting Firebase Messaging instance...');
+        let messaging: any;
+        try {
+            const msgPromise = getFirebaseMessaging();
+            const msgTimeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('getFirebaseMessaging timed out after 10s')), 10000)
+            );
+            messaging = await Promise.race([msgPromise, msgTimeout]);
+        } catch (msgError: any) {
+            console.error('Web Push: getFirebaseMessaging failed:', msgError?.message);
+            return;
+        }
+
+        if (!messaging) {
+            console.warn('Web Push: Firebase Messaging not supported');
+            return;
+        }
+        console.log('Web Push: Firebase Messaging instance obtained');
+
+        // Get FCM token - wrapped in its own try-catch with timeout
+        // because push service may not be available (e.g. no VAPID key, localhost)
+        let token: string | null = null;
+        try {
+            console.log('Web Push: Requesting FCM token with VAPID key...');
+            console.log('Web Push: Service worker state:', swRegistration.active?.state);
+
+            // Add timeout to prevent infinite hang
+            const tokenPromise = getToken(messaging, {
+                vapidKey: 'BDZhFCkU7XwXwzk-O0DfqrKR6cRQiegFMjFBGXvFXL61iInWtfs0cetqVLf3UHvgae-mMcId3u2b50t4uLiWaAM',
+                serviceWorkerRegistration: swRegistration,
+            });
+
+            const timeoutPromise = new Promise<string>((_, reject) =>
+                setTimeout(() => reject(new Error('getToken timed out after 15 seconds')), 15000)
+            );
+
+            token = await Promise.race([tokenPromise, timeoutPromise]);
+            console.log('Web Push: getToken resolved successfully');
+        } catch (tokenError: any) {
+            // AbortError / push service error = VAPID key not configured or push not available (common in dev environments)
+            const isExpectedDevError =
+                tokenError?.code === 'messaging/token-subscribe-failed' ||
+                tokenError?.name === 'AbortError' ||
+                tokenError?.message?.includes('push service') ||
+                tokenError?.message?.includes('Registration failed - push service error') ||
+                tokenError?.message?.includes('timed out');
+
+            if (isExpectedDevError) {
+                console.warn(
+                    'Web Push: Push service not available or timed out.',
+                    '\n→ This is normal in local development or if VAPID keys are missing/incorrect.',
+                    '\nError:', tokenError?.message
+                );
+            } else {
+                console.error('Web Push: getToken failed:', tokenError?.message || tokenError);
+                console.error('Web Push: Error details:', JSON.stringify(tokenError, null, 2));
+                console.error('Web Push: Failed to get FCM token:', tokenError);
+            }
+            return;
+        }
+
+        if (token) {
+            console.log('Web Push: FCM Token obtained:', token.substring(0, 20) + '...');
+            await saveTokenToSupabase(userId, token);
+        } else {
+            console.warn('Web Push: No token received. Make sure VAPID key is configured.');
+        }
+
+        // Listen for foreground messages
+        onMessage(messaging, (payload) => {
+            console.log('Web Push: Foreground message received:', payload);
+
+            const title = payload.notification?.title || 'إشعار جديد';
+            const body = payload.notification?.body || '';
+
+            const notifType = payload.data?.type === 'new_product' ? 'product'
+                : payload.data?.type === 'order_status_update' ? 'order'
+                    : 'general';
+
+            // Show in-app notification toast
+            showInAppNotification(title, body, notifType);
+
+            // Also show native browser notification popup
+            try {
+                if (Notification.permission === 'granted') {
+                    const notification = new Notification(title, {
+                        body: body,
+                        icon: '/icon-192.png',
+                        badge: '/icon-192.png',
+                        dir: 'rtl',
+                        tag: payload.data?.type || 'general',
+                        silent: true,
+                    } as NotificationOptions);
+                    // Click to navigate to cart for order notifications
+                    notification.onclick = () => {
+                        window.focus();
+                        if (notifType === 'order') {
+                            window.location.href = '/cart';
+                        }
+                    };
+                }
+            } catch (e) {
+                console.warn('Web Push: Native notification failed:', e);
+            }
+
+            // Play notification sound
+            try {
+                const audio = new Audio('/notification-sound.wav');
+                audio.volume = 0.5;
+                audio.play().catch(() => { });
+            } catch (e) {
+                // Sound play failed silently
+            }
+        });
+
+    } catch (error) {
+        console.warn('Web Push: Failed to initialize (non-critical):', error);
+    }
+}
+
+/**
+ * Register Firebase Messaging service worker
+ */
+async function registerFirebaseServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+    if (!('serviceWorker' in navigator)) {
+        console.warn('Web Push: Service workers not supported');
+        return null;
+    }
+
+    try {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+            scope: '/firebase-cloud-messaging-push-scope',
+        });
+        console.log('Web Push: Service worker registered:', registration.scope);
+
+        // Wait for the service worker to become active
+        // NOTE: Do NOT use navigator.serviceWorker.ready here!
+        // It waits for a SW controlling the current page scope, but our Firebase SW
+        // has a different scope (/firebase-cloud-messaging-push-scope), so it hangs forever.
+        if (registration.installing) {
+            await new Promise<void>((resolve) => {
+                registration.installing!.addEventListener('statechange', (e) => {
+                    if ((e.target as ServiceWorker).state === 'activated') {
+                        resolve();
+                    }
+                });
+            });
+        }
+        console.log('Web Push: Service worker is active');
+        return registration;
+    } catch (error) {
+        console.error('Web Push: Service worker registration failed:', error);
+        return null;
+    }
+}
+
+/**
  * Save FCM token to Supabase user_fcm_tokens table
  */
 async function saveTokenToSupabase(userId: string, token: string) {
-    if (!supabaseClient) return;
+    console.log(`[DEBUG] saveTokenToSupabase called with userId: ${userId}, token: ${token ? token.substring(0, 10) + '...' : 'undefined'}`);
+
+    if (!supabaseClient) {
+        console.error('[DEBUG] saveTokenToSupabase: supabaseClient is undefined!');
+        return;
+    }
 
     try {
-        // Upsert token - if this token already exists, update it
+        const deviceName = getDeviceName();
+        console.log(`[DEBUG] saveTokenToSupabase: Attempting upsert for device: ${deviceName}`);
+
+        // Call the secure RPC function to assign token and remove from any other users
+        // This ensures the device token always perfectly strict matches the CURRENT logged-in user
         const { error } = await supabaseClient
-            .from('user_fcm_tokens')
-            .upsert(
-                {
-                    user_id: userId,
-                    token: token,
-                    device_name: getDeviceName(),
-                    last_updated: new Date().toISOString(),
-                },
-                {
-                    onConflict: 'user_id, token',
-                }
-            );
+            .rpc('assign_fcm_token', {
+                p_user_id: userId,
+                p_token: token,
+                p_device_name: deviceName
+            });
 
         if (error) {
-            console.error('Push Notifications: Failed to save FCM token to Supabase:', error);
+            console.error('[DEBUG] Push Notifications: Failed to save FCM token to Supabase:', error);
+            console.error('[DEBUG] Supabase Error Details:', JSON.stringify(error));
         } else {
-            console.log('Push Notifications: FCM token saved successfully to Supabase for user:', userId);
+            console.log('[DEBUG] Push Notifications: FCM token saved successfully to Supabase for user:', userId);
         }
     } catch (e) {
-        console.error('Exception saving FCM token:', e);
+        console.error('[DEBUG] Exception saving FCM token:', e);
     }
 }
 
@@ -157,14 +395,14 @@ async function saveTokenToSupabase(userId: string, token: string) {
  * Remove FCM token when user logs out
  */
 export async function removePushNotificationToken() {
-    if (!isNativePlatform() || !supabaseClient) return;
+    if (!supabaseClient) return;
 
     try {
-        const { PushNotifications } = await import('@capacitor/push-notifications');
-
-        // Remove all listeners
-        await PushNotifications.removeAllListeners();
-
+        if (isNativePlatform()) {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+            await PushNotifications.removeAllListeners();
+        }
+        // For web, the token will be invalidated automatically when user logs out
     } catch (error) {
         console.error('Failed to remove push notification token:', error);
     }
@@ -174,10 +412,20 @@ export async function removePushNotificationToken() {
  * Get device name for token identification
  */
 function getDeviceName(): string {
+    if (isNativePlatform()) {
+        const ua = navigator.userAgent;
+        if (ua.includes('Android')) return 'android';
+        if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
+        return 'native';
+    }
+
+    // Web browser detection
     const ua = navigator.userAgent;
-    if (ua.includes('Android')) return 'Android';
-    if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
-    return 'Unknown';
+    if (ua.includes('Chrome') && !ua.includes('Edge')) return 'web-chrome';
+    if (ua.includes('Firefox')) return 'web-firefox';
+    if (ua.includes('Safari') && !ua.includes('Chrome')) return 'web-safari';
+    if (ua.includes('Edge')) return 'web-edge';
+    return 'web';
 }
 
 /**

@@ -18,154 +18,89 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("Push Notification Function (New Order -> Admin) Initialized")
+console.log("Push Notification Function Initialized")
 console.log("Firebase project:", FIREBASE_SERVICE_ACCOUNT.project_id || 'NOT SET')
 
 serve(async (req) => {
-    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        const { record, old_record, type } = await req.json()
+        const payload = await req.json()
+        console.log('Notification Payload:', payload)
+
+        const { record, old_record, type } = payload
 
         if (!record) {
             return new Response(JSON.stringify({ message: 'No record found' }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
             })
         }
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
         const accessToken = await getAccessToken(FIREBASE_SERVICE_ACCOUNT)
 
-        // --- CASE 1: NEW ORDER (INSERT) -> Notify Admins ---
-        if (type === 'INSERT' || (!type && !old_record)) {
-            console.log('New order received:', JSON.stringify(record))
+        // --- NEW ORDER (INSERT) OR DEFAULT -> Notify Admin ---
+        if (!type || type === 'INSERT') {
+            console.log(`New order created: ${record.id}, notifying admins`)
 
-            // 1. Get all admin user IDs
-            const { data: admins, error: adminError } = await supabase
+            const { data: admins } = await supabase
                 .from('profiles')
                 .select('user_id')
                 .eq('role', 'admin')
+                .eq('is_clocked_in', true)
 
-            if (adminError) throw adminError
             const adminIds = admins?.map(a => a.user_id) || []
 
-            if (adminIds.length === 0) {
-                return new Response(JSON.stringify({ message: 'No admins found' }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                })
-            }
-
-            // 2. Get FCM tokens for all admins
-            const { data: tokens, error: tokenError } = await supabase
+            const { data: tokens } = await supabase
                 .from('user_fcm_tokens')
                 .select('token')
                 .in('user_id', adminIds)
 
-            if (tokenError) throw tokenError
             const fcmTokens = [...new Set(tokens?.map(t => t.token) || [])]
 
             if (fcmTokens.length === 0) {
                 return new Response(JSON.stringify({ message: 'No admin tokens found' }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200
                 })
             }
 
-            // 3. Send notification to admins
-            const totalAmount = record.total_amount || 0
-            const customerName = record.customer_name || 'زبون'
-
-            const results = await Promise.all(fcmTokens.map(token =>
-                sendFCM(accessToken, FIREBASE_SERVICE_ACCOUNT.project_id, token, {
-                    title: 'طلب جديد! 🎉',
-                    body: `طلب جديد من ${customerName} بقيمة ${totalAmount} د.ع`,
+            const results = await Promise.all(fcmTokens.map(async (token) => {
+                const notificationPayload = {
+                    title: `طلب جديد! #${(record.id || '').slice(0, 8)}`,
+                    body: `طلب جديد من ${record.customer_name || 'عميل'} بقيمة ${record.total_amount || 0}`,
                     data: {
                         type: 'new_order',
                         order_id: record.id || '',
+                        click_action: 'FLUTTER_NOTIFICATION_CLICK',
                     }
-                })
-            ))
+                }
+                return sendFCM(accessToken, FIREBASE_SERVICE_ACCOUNT.project_id, token, notificationPayload)
+            }))
 
-            return new Response(JSON.stringify({ success: true, type: 'admin_notification', sent_to: fcmTokens.length }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            return new Response(JSON.stringify({ success: true, type: 'admin_notification', sent_to: fcmTokens.length, results }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
             })
         }
 
-        // --- CASE 2: STATUS UPDATE (UPDATE) -> Notify Customer ---
-        if (type === 'UPDATE' || (old_record && record.status !== old_record.status)) {
-            const newStatus = record.status
-            const oldStatus = old_record?.status
-
-            if (newStatus === oldStatus) {
-                return new Response(JSON.stringify({ message: 'Status unchanged' }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                })
-            }
-
-            console.log(`Order ${record.id} status changed: ${oldStatus} -> ${newStatus}`)
-
-            const statusLabels: Record<string, string> = {
-                pending: 'في الانتظار',
-                confirmed: 'مؤكد',
-                preparing: 'قيد التحضير',
-                ready: 'جاهز للاستلام',
-                delivered: 'تم التسليم',
-                cancelled: 'ملغى',
-            }
-
-            const statusLabel = statusLabels[newStatus] || newStatus
-            const orderNum = (record.id || '').slice(0, 8)
-
-            // 1. Get FCM tokens for the customer
-            const { data: tokens, error: tokenError } = await supabase
-                .from('user_fcm_tokens')
-                .select('token')
-                .eq('user_id', record.user_id)
-
-            if (tokenError) throw tokenError
-            const customerTokens = [...new Set(tokens?.map(t => t.token) || [])]
-
-            if (customerTokens.length === 0) {
-                return new Response(JSON.stringify({ message: 'No customer tokens found' }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                })
-            }
-
-            // 2. Send notification to customer
-            const results = await Promise.all(customerTokens.map(token =>
-                sendFCM(accessToken, FIREBASE_SERVICE_ACCOUNT.project_id, token, {
-                    title: `📦 تحديث طلبك #${orderNum}`,
-                    body: `حالة طلبك تغيرت إلى: ${statusLabel}`,
-                    data: {
-                        type: 'order_status_update',
-                        order_id: record.id || '',
-                    }
-                })
-            ))
-
-            return new Response(JSON.stringify({ success: true, type: 'customer_notification', sent_to: customerTokens.length }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-        }
-
-        return new Response(JSON.stringify({ message: 'Nothing to do' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ message: 'Ignored: Not a new order' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
         })
 
     } catch (error) {
         console.error('Error in push-notification function:', error)
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
+            status: 500
         })
     }
 })
 
-/**
- * Helper to send FCM message
- */
 async function sendFCM(accessToken: string, projectId: string, token: string, payload: { title: string, body: string, data: any }) {
     const res = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
         method: 'POST',
@@ -180,12 +115,17 @@ async function sendFCM(accessToken: string, projectId: string, token: string, pa
                     title: payload.title,
                     body: payload.body,
                 },
-                data: payload.data,
+                data: {
+                    ...payload.data,
+                    title: payload.title,
+                    body: payload.body,
+                },
                 android: {
                     priority: "high",
                     notification: {
                         sound: "default",
-                        channel_id: "orders_channel",
+                        channel_id: "default",
+                        icon: "ic_notification",
                         click_action: "FCM_PLUGIN_ACTIVITY",
                         default_vibrate_timings: true,
                         default_light_settings: true,
