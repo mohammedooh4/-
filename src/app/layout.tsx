@@ -43,6 +43,19 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.OneSignalDeferred = window.OneSignalDeferred || [];
+              OneSignalDeferred.push(async function(OneSignal) {
+                await OneSignal.init({
+                  appId: "52b04508-c26d-4008-8df4-6b20384617eb",
+                });
+              });
+            `,
+          }}
+        />
       </head>
       <body className={cn("font-body antialiased pb-20", systemFonts.className)} style={systemFonts.style}>
         {/* Disable Service Worker on Native Capacitor Platforms to prevent white screen caching issues */}

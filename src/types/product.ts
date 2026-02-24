@@ -10,4 +10,6 @@ export interface Product {
   stock?: number;
   is_available?: boolean;
   options?: string[];
+  parent_id?: string | null;
+  variants?: Product[];
 }

@@ -30,7 +30,9 @@ function mapToProduct(data: any): Product {
         ai_hint: data.ai_hint || '',
         category_id: String(data.category_id || ''),
         is_available: Boolean(data.is_available ?? true),
-        options: Array.isArray(data.options) && data.options.length > 0 ? data.options : undefined
+        options: Array.isArray(data.options) && data.options.length > 0 ? data.options : undefined,
+        parent_id: data.parent_id ? String(data.parent_id) : null,
+        variants: Array.isArray(data.variants) ? data.variants.map((v: any) => mapToProduct(v)) : undefined
     };
 }
 
@@ -44,7 +46,7 @@ export async function getProductById_client(id: string): Promise<Product | undef
     try {
         const { data, error } = await supabaseClient
             .from('products')
-            .select('*')
+            .select('*, variants:products!parent_id(*)')
             .eq('id', id)
             .single();
 
@@ -101,7 +103,8 @@ export async function getProducts_client(page: number = 1, pageSize: number = 20
     try {
         let query = supabaseClient
             .from('products')
-            .select('*') // Get all fields including description
+            .select('*, variants:products!parent_id(*)') // Get all fields including description and variants
+            .is('parent_id', null) // Only fetch parent products for the grid
             .eq('is_available', true) // Filter only available products
             .order('created_at', { ascending: false })
             .range(start, end);
@@ -139,9 +142,10 @@ export async function searchProducts(query: string): Promise<Product[]> {
     try {
         let dbQuery = supabaseClient
             .from('products')
-            .select('id, name, price, image, is_available')
+            .select('id, name, price, image, is_available, variants:products!parent_id(id, name, price, image, is_available)')
+            .is('parent_id', null) // Only fetch parent products
             .eq('is_available', true) // Filter only available products
-            .range(0, 19);
+            .range(0, 50); // Get more as we might filter some out if complex
 
         // Check if query is numeric (potential barcode)
         const isNumeric = /^\d+$/.test(query.trim());
@@ -151,10 +155,36 @@ export async function searchProducts(query: string): Promise<Product[]> {
             // User requested eq('barcode', query)
             dbQuery = dbQuery.eq('barcode', query.trim());
         } else {
-            dbQuery = dbQuery.ilike('name', `%${query.trim()}%`);
+            // We want to find parent products where either the parent matches, OR any of its children match.
+            // In standard PostgREST this is tricky without a custom view or RPC, but we can do a simplified
+            // approach: we can use the `or` filter with an embedded resource if supported, but typically it isn't.
+            // As a fallback for now, we just fetch a larger subset and filter in memory, OR we can search all products
+            // and group them. Let's do a subquery-like approach if possible, or search independently.
+            // Easiest approach for robust filtering: search all products, then resolve to their parents.
+            // But to keep it simple and within the current schema, let's just search all names and then deduplicate
+            // by parent_id.
+
+            const rawSearchQuery = supabaseClient
+                .from('products')
+                .select('id, parent_id')
+                .eq('is_available', true)
+                .ilike('name', `%${query.trim()}%`)
+                .limit(50);
+
+            const { data: searchHits, error: searchError } = await rawSearchQuery;
+            if (searchError) throw searchError;
+
+            if (!searchHits || searchHits.length === 0) return [];
+
+            // Collect the parent IDs we need to fetch
+            const parentIdsToFetch = Array.from(new Set(
+                searchHits.map(hit => hit.parent_id ? hit.parent_id : hit.id)
+            ));
+
+            dbQuery = dbQuery.in('id', parentIdsToFetch);
         }
 
-        const { data, error } = await dbQuery.order('created_at', { ascending: false });
+        const { data, error } = await dbQuery.order('created_at', { ascending: false }).limit(19);
 
         if (error) {
             console.error("Error searching products:", error);
@@ -230,7 +260,8 @@ export async function getProductsByCategory_client(categoryId: string, page: num
     try {
         const { data, error } = await supabaseClient
             .from('products')
-            .select('id, name, price, image, stock, category_id, is_available')
+            .select('id, name, price, image, stock, category_id, is_available, variants:products!parent_id(id, name, price, image, stock, category_id, is_available)')
+            .is('parent_id', null)
             .eq('category_id', categoryId)
             .eq('is_available', true)
             .order('created_at', { ascending: false })

@@ -254,7 +254,7 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                 ) : (
-                    <ProductGrid products={products} categories={initialCategories} />
+                    <ProductGrid products={products} categories={initialCategories} searchQuery={searchQuery} />
                 )}
 
                 {/* Infinite Scroll Trigger */}
