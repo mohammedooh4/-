@@ -177,15 +177,14 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
                       e.stopPropagation();
                       setActiveIndex(idx);
                     }}
-                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-white shadow-md ${idx === activeIndex ? 'w-10 h-10 md:w-12 md:h-12 border-[2px] md:border-[2.5px] border-zinc-900 scale-110' : 'w-8 h-8 md:w-10 md:h-10 border-2 border-white opacity-80 hover:opacity-100 hover:scale-105'}`}
-                    style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
+                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-white shadow-md ${idx === activeIndex ? 'w-11 h-11 md:w-14 md:h-14 border-[2px] md:border-[2.5px] border-zinc-900' : 'w-9 h-9 md:w-11 md:h-11 border-2 border-transparent opacity-80 hover:opacity-100'}`}
                     aria-label={`عرض ${prod.name}`}
                   >
                     <Image
                       src={getOptimizedImage(prod.image)}
                       alt={`صورة ${prod.name}`}
                       fill
-                      sizes="48px"
+                      sizes="56px"
                       className="object-cover"
                     />
                   </button>
