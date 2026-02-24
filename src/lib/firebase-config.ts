@@ -8,7 +8,7 @@ const firebaseConfig = {
     storageBucket: "market-management-6129d.firebasestorage.app",
     messagingSenderId: "318547026343",
     appId: "1:318547026343:web:fc34f297cf750e852e1682",
-    measurementId: "G-SBGCMS9KT5",
+    measurementId: "G-SBGCMS9KT5"
 };
 
 // Initialize Firebase (only once)
