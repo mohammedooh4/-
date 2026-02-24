@@ -227,7 +227,7 @@ async function initWebPushNotifications(userId: string) {
             console.log('Web Push: Service worker state:', swRegistration.active?.state);
 
             // Add timeout to prevent infinite hang (Increased timeout for dev environments)
-            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || 'BDZhFCkU7XwXwzk-O0DfqrKR6cRQiegFMjFBGXvFXL61iInWtfs0cetqVLf3UHvgae-mMcId3u2b50t4uLiWaAM';
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || 'BK0uzO9AiKpabodvzGIE1NpZzW_7NroAgJ8K3itMWrK-B8UeWov8_64tRBChff1__nvek8h5GLJ2xcZ3zHuegAE';
 
             console.log('Web Push: Using VAPID key starting with:', vapidKey.substring(0, 5) + '...');
 
