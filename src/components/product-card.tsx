@@ -177,7 +177,8 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
                       e.stopPropagation();
                       setActiveIndex(idx);
                     }}
-                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-white border-[2px] md:border-[2.5px] shadow-md ${idx === activeIndex ? 'w-10 h-10 md:w-12 md:h-12 border-zinc-900 scale-110' : 'w-8 h-8 md:w-10 md:h-10 border-white opacity-80 hover:opacity-100 hover:scale-105'}`}
+                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-white shadow-md ${idx === activeIndex ? 'w-10 h-10 md:w-12 md:h-12 border-[2px] md:border-[2.5px] border-zinc-900 scale-110' : 'w-8 h-8 md:w-10 md:h-10 border-2 border-white opacity-80 hover:opacity-100 hover:scale-105'}`}
+                    style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
                     aria-label={`عرض ${prod.name}`}
                   >
                     <Image
