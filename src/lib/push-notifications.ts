@@ -289,16 +289,28 @@ async function initWebPushNotifications(userId: string) {
 
             // Also show native browser notification popup
             try {
-                if (Notification.permission === 'granted') {
+                if (swRegistration && swRegistration.active) {
+                    swRegistration.showNotification(title, {
+                        body: body,
+                        icon: '/icon-192.png',
+                        badge: '/icon-192.png',
+                        dir: 'rtl',
+                        tag: payload.data?.type || 'general',
+                        data: payload.data, // Pass data so the SW click handler knows where to navigate
+                        requireInteraction: true, // Native push stays on screen until dismissed
+                    });
+                } else if (Notification.permission === 'granted') {
+                    // Fallback to window Notification API
                     const notification = new Notification(title, {
                         body: body,
                         icon: '/icon-192.png',
                         badge: '/icon-192.png',
                         dir: 'rtl',
                         tag: payload.data?.type || 'general',
-                        silent: true,
+                        data: payload.data,
                     } as NotificationOptions);
-                    // Click to navigate to cart for order notifications
+
+                    // Click to navigate
                     notification.onclick = () => {
                         window.focus();
                         if (notifType === 'order') {
