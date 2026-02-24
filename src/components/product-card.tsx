@@ -147,17 +147,17 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
             <>
               <button
                 onClick={handlePrevImage}
-                className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 z-20 bg-white shadow-md hover:bg-zinc-50 text-zinc-900 p-2 md:p-2.5 rounded-full transition-transform hover:scale-110 active:scale-95"
+                className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 z-20 bg-white shadow-md hover:bg-zinc-50 text-zinc-900 w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
                 aria-label="الصورة السابقة"
               >
-                <ChevronRight className="w-5 h-5 md:w-6 md:h-6" strokeWidth={2.5} />
+                <ChevronRight className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
               </button>
               <button
                 onClick={handleNextImage}
-                className="absolute left-2 md:left-3 top-1/2 -translate-y-1/2 z-20 bg-white shadow-md hover:bg-zinc-50 text-zinc-900 p-2 md:p-2.5 rounded-full transition-transform hover:scale-110 active:scale-95"
+                className="absolute left-2 md:left-3 top-1/2 -translate-y-1/2 z-20 bg-white shadow-md hover:bg-zinc-50 text-zinc-900 w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
                 aria-label="الصورة التالية"
               >
-                <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" strokeWidth={2.5} />
+                <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
               </button>
             </>
           )}
