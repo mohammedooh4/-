@@ -226,14 +226,18 @@ async function initWebPushNotifications(userId: string) {
             console.log('Web Push: Requesting FCM token with VAPID key...');
             console.log('Web Push: Service worker state:', swRegistration.active?.state);
 
-            // Add timeout to prevent infinite hang
+            // Add timeout to prevent infinite hang (Increased timeout for dev environments)
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || 'BDZhFCkU7XwXwzk-O0DfqrKR6cRQiegFMjFBGXvFXL61iInWtfs0cetqVLf3UHvgae-mMcId3u2b50t4uLiWaAM';
+
+            console.log('Web Push: Using VAPID key starting with:', vapidKey.substring(0, 5) + '...');
+
             const tokenPromise = getToken(messaging, {
-                vapidKey: 'BDZhFCkU7XwXwzk-O0DfqrKR6cRQiegFMjFBGXvFXL61iInWtfs0cetqVLf3UHvgae-mMcId3u2b50t4uLiWaAM',
+                vapidKey: vapidKey,
                 serviceWorkerRegistration: swRegistration,
             });
 
             const timeoutPromise = new Promise<string>((_, reject) =>
-                setTimeout(() => reject(new Error('getToken timed out after 15 seconds')), 15000)
+                setTimeout(() => reject(new Error('getToken timed out after 20 seconds')), 20000)
             );
 
             token = await Promise.race([tokenPromise, timeoutPromise]);
@@ -247,10 +251,11 @@ async function initWebPushNotifications(userId: string) {
                 tokenError?.message?.includes('Registration failed - push service error') ||
                 tokenError?.message?.includes('timed out');
 
-            if (isExpectedDevError) {
+            if (isExpectedDevError || tokenError?.message?.includes('Registration failed - push service error')) {
                 console.warn(
                     'Web Push: Push service not available or timed out.',
-                    '\n→ This is normal in local development or if VAPID keys are missing/incorrect.',
+                    '\n→ This is normal in local development (HTTP) or if VAPID keys are incorrect.',
+                    '\n→ For web push to work reliably, you must be on HTTPS or localhost with valid keys.',
                     '\nError:', tokenError?.message
                 );
             } else {
