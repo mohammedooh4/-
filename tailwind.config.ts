@@ -71,6 +71,12 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      boxShadow: {
+        'neumorph': 'var(--neumorph-shadow)',
+        'neumorph-inset': 'var(--neumorph-inset-shadow)',
+        'neumorph-sm': 'var(--neumorph-shadow-sm)',
+        'neumorph-inset-sm': 'var(--neumorph-inset-shadow-sm)',
+      },
       keyframes: {
         'accordion-down': {
           from: {
