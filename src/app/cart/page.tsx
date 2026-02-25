@@ -17,7 +17,6 @@ import { supabaseClient } from "@/lib/supabase";
 import type { CartItem } from "@/context/cart-context";
 import type { User } from '@supabase/supabase-js'
 import { Input } from "@/components/ui/input";
-import QRCode from "react-qr-code";
 import { cn } from "@/lib/utils";
 
 // --- Logic remains the same ---
@@ -79,7 +78,7 @@ async function createOrder(cartItems: CartItem[], totalPrice: number, user: User
       customer_name: user.user_metadata?.full_name || user.email || 'N/A',
       customer_email: user.email,
       customer_phone: contactPhone || '',
-      notes: notes,
+      notes: notes
     };
 
     if (includeUserId) {
@@ -713,6 +712,7 @@ export default function CartPage() {
                       className="resize-none rounded-xl bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 min-h-[60px] md:min-h-[80px] text-sm md:text-base"
                     />
                   </div>
+
                 </div>
 
                 <div className="pt-2">
