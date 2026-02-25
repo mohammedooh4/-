@@ -1,7 +1,8 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingBag, Home, LogOut, LogIn, Package, Tag, Settings, Menu, Loader2 } from 'lucide-react';
+import { Home, LogOut, LogIn, Package, Tag, Settings, Menu, Loader2, Heart, ClipboardList } from 'lucide-react';
+import Image from 'next/image';
 import { useCart } from '@/context/cart-context';
 import { useAuth } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
@@ -105,15 +106,15 @@ export function BottomNavBar({ initialCategories = [] }: BottomNavBarProps) {
     return cn(
       "relative p-3 rounded-full transition-all duration-300 ease-out",
       active
-        ? "bg-white text-black dark:bg-black dark:text-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)] dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]"
-        : "text-white dark:text-black hover:bg-white/10 dark:hover:bg-black/5 hover:scale-105"
+        ? "bg-background text-primary shadow-neumorph-inset"
+        : "text-foreground hover:shadow-neumorph shadow-none"
     );
   };
 
   return (
     <>
-      <div className="fixed bottom-6 left-4 right-4 z-50">
-        <nav className="bg-black/90 dark:bg-white/90 backdrop-blur-xl rounded-full shadow-2xl h-16 px-6 flex items-center justify-between mx-auto max-w-md border border-white/10 dark:border-black/5">
+      <div className="fixed bottom-6 left-2 right-2 md:left-4 md:right-4 z-50">
+        <nav className="bg-background rounded-full shadow-neumorph h-16 px-4 md:px-6 flex items-center justify-between mx-auto max-w-sm md:max-w-md border-none">
           {/* Home */}
           <Link
             href="/"
@@ -124,6 +125,16 @@ export function BottomNavBar({ initialCategories = [] }: BottomNavBarProps) {
             {navigatingTo === '/' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Home className="h-6 w-6" />}
           </Link>
 
+          {/* Categories Page Link */}
+          <Link
+            href="/categories"
+            aria-label="الاقسام"
+            className={getNavItemClass(!!isCategoryActive)}
+            onClick={() => handleNavClick('/categories')}
+          >
+            {navigatingTo === '/categories' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Tag className="h-6 w-6" />}
+          </Link>
+
           {/* Cart */}
           <Link
             href="/cart"
@@ -131,7 +142,20 @@ export function BottomNavBar({ initialCategories = [] }: BottomNavBarProps) {
             className={getNavItemClass(isActive('/cart'))}
             onClick={() => handleNavClick('/cart')}
           >
-            {navigatingTo === '/cart' ? <Loader2 className="h-6 w-6 animate-spin" /> : <ShoppingBag className="h-6 w-6" />}
+            {navigatingTo === '/cart' ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <Image
+                src="/icons/shopping-cart.png"
+                alt="Cart"
+                width={24}
+                height={24}
+                className={cn(
+                  "object-contain w-6 h-6 transition-all duration-300",
+                  isActive('/cart') ? "" : "opacity-80"
+                )}
+              />
+            )}
             {isClient && totalItems > 0 && (
               <span className={cn(
                 "absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm",
@@ -142,14 +166,14 @@ export function BottomNavBar({ initialCategories = [] }: BottomNavBarProps) {
             )}
           </Link>
 
-          {/* Categories Page Link */}
+          {/* Favorites Link */}
           <Link
-            href="/categories"
-            aria-label="الاقسام"
-            className={getNavItemClass(!!isCategoryActive)}
-            onClick={() => handleNavClick('/categories')}
+            href="/favorites"
+            aria-label="المفضلة"
+            className={getNavItemClass(isActive('/favorites'))}
+            onClick={() => handleNavClick('/favorites')}
           >
-            {navigatingTo === '/categories' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Tag className="h-6 w-6" />}
+            {navigatingTo === '/favorites' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Heart className="h-6 w-6" />}
           </Link>
 
           {/* Settings / User Profile (Gear Icon) */}
@@ -172,7 +196,11 @@ export function BottomNavBar({ initialCategories = [] }: BottomNavBarProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                <DropdownMenuItem onClick={() => router.push('/orders')} className="cursor-pointer">
+                  <ClipboardList className="ml-2 h-4 w-4" />
+                  <span>سجل الطلبات</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 cursor-pointer">
                   <LogOut className="ml-2 h-4 w-4" />
                   <span>تسجيل الخروج</span>
                 </DropdownMenuItem>

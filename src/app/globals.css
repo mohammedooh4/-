@@ -13,13 +13,14 @@ body {
 
 @layer base {
   :root {
-    --background: 220 20% 98%; /* Light Grey */
-    --foreground: 224 71% 4%; /* Dark Grey */
-    --card: 0 0% 100%;
+    --background: 216 33% 94%;
+    --foreground: 224 71% 4%;
+    --card: 216 33% 94%;
     --card-foreground: 224 71% 4%;
-    --popover: 0 0% 100%;
+    --popover: 216 33% 94%;
     --popover-foreground: 224 71% 4%;
-    --primary: 240 10% 3.9%; /* Black/Dark Zinc */
+    --primary: 240 10% 3.9%;
+    /* Black/Dark Zinc */
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
@@ -46,13 +47,21 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --neumorph-light: #ffffff;
+    --neumorph-dark: #c8d0e7;
+    --neumorph-shadow: 4px 4px 8px var(--neumorph-dark), -4px -4px 8px var(--neumorph-light);
+    --neumorph-inset-shadow: inset 4px 4px 8px var(--neumorph-dark), inset -4px -4px 8px var(--neumorph-light);
+    --neumorph-shadow-sm: 2px 2px 4px var(--neumorph-dark), -2px -2px 4px var(--neumorph-light);
+    --neumorph-inset-shadow-sm: inset 2px 2px 4px var(--neumorph-dark), inset -2px -2px 4px var(--neumorph-light);
   }
+
   .dark {
-    --background: 224 71% 4%;
+    --background: 224 40% 12%;
     --foreground: 215 28% 85%;
-    --card: 224 71% 4%;
+    --card: 224 40% 12%;
     --card-foreground: 215 28% 85%;
-    --popover: 224 71% 4%;
+    --popover: 224 40% 12%;
     --popover-foreground: 215 28% 85%;
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
@@ -80,6 +89,13 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --neumorph-light: hsl(224 40% 16%);
+    --neumorph-dark: hsl(224 40% 5%);
+    --neumorph-shadow: 4px 4px 8px var(--neumorph-dark), -4px -4px 8px var(--neumorph-light);
+    --neumorph-inset-shadow: inset 4px 4px 8px var(--neumorph-dark), inset -4px -4px 8px var(--neumorph-light);
+    --neumorph-shadow-sm: 2px 2px 4px var(--neumorph-dark), -2px -2px 4px var(--neumorph-light);
+    --neumorph-inset-shadow-sm: inset 2px 2px 4px var(--neumorph-dark), inset -2px -2px 4px var(--neumorph-light);
   }
 }
 
@@ -87,6 +103,7 @@ body {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-tajawal), sans-serif;

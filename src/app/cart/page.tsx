@@ -11,6 +11,7 @@ import { ShoppingBag, Loader2, LogIn, Plus, Minus, Trash2, ArrowRight } from "lu
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { AnimatedSendButton } from "@/components/ui/animated-send-button";
 import { Label } from "@/components/ui/label";
 import { supabaseClient } from "@/lib/supabase";
 import type { CartItem } from "@/context/cart-context";
@@ -728,23 +729,11 @@ export default function CartPage() {
                       </Link>
                     </Button>
                   ) : (
-                    <Button
-                      className="w-full h-10 md:h-14 rounded-xl text-sm md:text-lg font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-[0.98]"
+                    <AnimatedSendButton
                       onClick={handleCheckout}
-                      disabled={isCheckoutLoading || cartItems.length === 0}
-                    >
-                      {isCheckoutLoading ? (
-                        <>
-                          <Loader2 className="ml-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
-                          جاري الإرسال...
-                        </>
-                      ) : (
-                        <>
-                          إتمام الطلب
-                          <ArrowRight className="mr-2 h-4 w-4 md:h-5 md:w-5" />
-                        </>
-                      )}
-                    </Button>
+                      isLoading={isCheckoutLoading}
+                      disabled={cartItems.length === 0}
+                    />
                   )}
 
                   {user && (

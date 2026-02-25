@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { CartProvider } from '@/context/cart-context';
 import { AuthProvider } from '@/context/auth-context';
+import { FavoritesProvider } from '@/context/favorites-context';
 import { BottomNavBar } from '@/components/bottom-nav-bar';
 import { MobileLayout } from '@/components/mobile-layout';
 import { cn } from '@/lib/utils';
@@ -79,13 +80,15 @@ export default function RootLayout({
           }}
         />
         <AuthProvider>
-          <CartProvider>
-            <MobileLayout>
-              <main>{children}</main>
-              <BottomNavBar />
-              <Toaster />
-            </MobileLayout>
-          </CartProvider>
+          <FavoritesProvider>
+            <CartProvider>
+              <MobileLayout>
+                <main>{children}</main>
+                <BottomNavBar />
+                <Toaster />
+              </MobileLayout>
+            </CartProvider>
+          </FavoritesProvider>
         </AuthProvider>
       </body>
     </html>

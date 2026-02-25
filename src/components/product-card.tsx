@@ -5,9 +5,11 @@ import Image from 'next/image';
 import type { Product } from '@/types/product';
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { useCart } from '@/context/cart-context';
+import { useFavorites } from '@/context/favorites-context';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SparkleButton } from '@/components/ui/sparkle-button';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product, categoryName, searchQuery }: ProductCardProps) {
   const { addToCart } = useCart();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | undefined>(undefined);
@@ -42,6 +45,9 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
 
   const activeProduct = allProducts[activeIndex] || product;
   const isUnavailable = activeProduct.is_available === false;
+
+  // Favorite the currently viewed product (the specific variant or parent the user is looking at)
+  const isFav = isFavorite(activeProduct.id);
 
   const getOptimizedImage = (url: string) => {
     if (!url || typeof url !== 'string') return '';
@@ -109,22 +115,30 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
   return (
     <>
       <div
-        className={`group relative bg-white dark:bg-zinc-900 rounded-[1.25rem] md:rounded-[1.75rem] p-2.5 md:p-3 flex flex-col shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-zinc-100 dark:border-zinc-800 transition-all duration-300 hover:shadow-lg ${isUnavailable ? 'opacity-50 ring-2 ring-red-400' : ''}`}
+        className={`group h-full relative bg-background rounded-[1.25rem] md:rounded-[1.75rem] p-2 md:p-3 flex flex-col shadow-neumorph border-none ${isUnavailable ? 'opacity-50 ring-2 ring-red-400' : ''}`}
+        style={{ contain: 'layout style paint', willChange: 'transform' }}
       >
         {/* Product Image & Badges & Thumbnails (Light gray block) */}
-        <div className="relative bg-[#f4f4f5] dark:bg-zinc-800/80 rounded-[1.1rem] md:rounded-2xl overflow-hidden mb-3 md:mb-4">
+        <div className="relative bg-background shadow-neumorph-inset rounded-[1.1rem] md:rounded-2xl overflow-hidden mb-3 md:mb-4">
           {/* Top Badges Overlay */}
           <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex justify-between items-start pointer-events-none gap-1">
-            <div className="flex flex-col gap-1 items-start pointer-events-auto shrink-0">
+            <div className="flex flex-col gap-2 items-start pointer-events-auto shrink-0">
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(activeProduct.id); }}
+                className={`bg-background text-red-500 w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full shadow-neumorph-sm active:shadow-neumorph-inset-sm transition-all ${isFav ? 'shadow-neumorph-inset-sm' : ''}`}
+                aria-label={isFav ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+              >
+                <Heart className={`w-[18px] h-[18px] md:w-5 md:h-5 transition-colors ${isFav ? 'fill-red-500 text-red-500' : 'text-muted-foreground hover:text-red-500'}`} strokeWidth={2.5} />
+              </button>
               {allProducts.length > 1 && (
-                <span className="bg-zinc-900/90 text-white text-[10px] md:text-[11px] px-2.5 py-1 rounded-full font-bold shadow-sm inline-block leading-tight">
+                <span className="bg-background text-foreground shadow-neumorph-sm text-[10px] md:text-[11px] px-2.5 py-1 rounded-full font-bold inline-block leading-tight">
                   خيارات أخرى
                 </span>
               )}
             </div>
 
             {categoryName && (
-              <span className="bg-zinc-500/90 text-white text-[10px] md:text-[11px] px-2.5 py-1 rounded-full font-medium shadow-sm inline-block pointer-events-auto leading-tight text-left max-w-[70%]" dir="ltr">
+              <span className="bg-background text-foreground shadow-neumorph-sm text-[10px] md:text-[11px] px-2.5 py-1 rounded-full font-medium pointer-events-auto leading-tight text-left max-w-[70%]" dir="ltr">
                 {categoryName}
               </span>
             )}
@@ -138,7 +152,7 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
               fill
               loading="lazy"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-contain p-4 mix-blend-multiply dark:mix-blend-normal transition-transform duration-500 ease-in-out group-hover:scale-105"
+              className="object-contain p-2 md:p-4 mix-blend-multiply dark:mix-blend-normal"
             />
           </AspectRatio>
 
@@ -147,14 +161,14 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
             <>
               <button
                 onClick={handlePrevImage}
-                className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 z-20 bg-white shadow-md hover:bg-zinc-50 text-zinc-900 w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+                className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 z-20 bg-background shadow-neumorph-sm active:shadow-neumorph-inset-sm text-foreground w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-transform"
                 aria-label="الصورة السابقة"
               >
                 <ChevronRight className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
               </button>
               <button
                 onClick={handleNextImage}
-                className="absolute left-2 md:left-3 top-1/2 -translate-y-1/2 z-20 bg-white shadow-md hover:bg-zinc-50 text-zinc-900 w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+                className="absolute left-2 md:left-3 top-1/2 -translate-y-1/2 z-20 bg-background shadow-neumorph-sm active:shadow-neumorph-inset-sm text-foreground w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-transform"
                 aria-label="الصورة التالية"
               >
                 <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
@@ -177,7 +191,7 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
                       e.stopPropagation();
                       setActiveIndex(idx);
                     }}
-                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-white shadow-md ${idx === activeIndex ? 'w-11 h-11 md:w-14 md:h-14 border-[2px] md:border-[2.5px] border-zinc-900' : 'w-9 h-9 md:w-11 md:h-11 border-2 border-transparent opacity-80 hover:opacity-100'}`}
+                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-background ${idx === activeIndex ? 'w-11 h-11 md:w-14 md:h-14 shadow-neumorph-inset p-1' : 'w-9 h-9 md:w-11 md:h-11 shadow-neumorph-sm hover:shadow-neumorph-inset-sm p-0.5 opacity-80 hover:opacity-100'}`}
                     aria-label={`عرض ${prod.name}`}
                   >
                     <Image
@@ -185,7 +199,7 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
                       alt={`صورة ${prod.name}`}
                       fill
                       sizes="56px"
-                      className="object-cover"
+                      className="object-cover rounded-full"
                     />
                   </button>
                 ))}
@@ -197,34 +211,29 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
         {/* Content Area */}
         <div className="flex flex-col flex-grow px-1.5 md:px-2 pb-0.5">
           {/* Title and Action Row */}
-          <div className="flex flex-col flex-grow justify-between gap-3 md:gap-4">
+          <div className="flex flex-col flex-grow justify-between gap-2 md:gap-4">
             {/* Title - Centered exactly like mockup */}
-            <h3 className="text-[14px] sm:text-[15px] md:text-[17px] font-bold leading-snug line-clamp-2 text-zinc-900 dark:text-zinc-100 text-center min-h-[2.5rem] md:min-h-[2.75rem]">
+            <h3 className="text-[13px] sm:text-[15px] md:text-[17px] font-bold leading-snug line-clamp-2 text-foreground text-center min-h-[2rem] md:min-h-[2.75rem]">
               {activeProduct.name}
             </h3>
 
-            {/* Bottom Action Row (Price left, thick button right) */}
-            <div className="flex items-center justify-between gap-3 w-full mt-auto mb-1">
+            {/* Bottom Action Row (Realistic Liquid Glass Pill) */}
+            <div className="flex items-center w-full mt-auto mb-1 rounded-full pl-2 pr-1 py-1 md:pl-4 md:pr-1.5 md:py-1.5 h-12 md:h-14 bg-gradient-to-b from-white to-gray-100 dark:from-zinc-700 dark:to-zinc-800 shadow-[inset_0_1px_2px_rgba(255,255,255,0.8),_0_2px_6px_rgba(0,0,0,0.06)] border border-white/60 dark:border-white/10">
 
-              {/* Cart Button (Right side, matching mockup squares) */}
-              <button
-                onClick={(e) => handleBuyClick(e)}
-                disabled={isUnavailable}
-                className="flex items-center justify-center bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 text-white p-3.5 md:p-4 rounded-[14px] md:rounded-[18px] transition-transform active:scale-95 disabled:opacity-50 flex-shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.15)] w-12 h-12 md:w-14 md:h-14"
-                aria-label={isUnavailable ? 'غير متوفر' : 'أضف للسلة'}
-              >
-                {isUnavailable ? (
-                  <span className="text-[11px] md:text-[12px] font-bold">نفذ</span>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 md:w-7 md:h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-                )}
-              </button>
-
-              {/* Price (Left side, big bold) */}
-              <div className="flex flex-col items-start overflow-hidden flex-1">
-                <span className="font-black text-[18px] sm:text-[20px] md:text-[26px] text-zinc-900 dark:text-zinc-100 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis w-full text-right" dir="ltr">
+              {/* Price (Left/center area) */}
+              <div className="flex flex-col items-center justify-center flex-1 overflow-hidden">
+                <span className="font-extrabold text-[14px] sm:text-[16px] md:text-[18px] text-foreground tracking-tight whitespace-nowrap overflow-hidden text-ellipsis w-full text-center" dir="ltr">
                   {activeProduct.price.toLocaleString('ar-IQ', { style: 'currency', currency: 'IQD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </span>
+              </div>
+
+              {/* Cart Button (Right side, using SparkleButton) */}
+              <div className="flex-shrink-0 w-10 h-10 md:w-11 md:h-11 relative z-10">
+                <SparkleButton
+                  onClick={handleBuyClick}
+                  disabled={isUnavailable}
+                  ariaLabel={isUnavailable ? 'غير متوفر' : 'أضف للسلة'}
+                />
               </div>
             </div>
           </div>
