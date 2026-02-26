@@ -140,58 +140,48 @@ export async function searchProducts(query: string): Promise<Product[]> {
     if (!supabaseClient || !query.trim()) return [];
 
     try {
-        let dbQuery = supabaseClient
-            .from('products')
-            .select('id, name, price, image, is_available, variants:products!parent_id(id, name, price, image, is_available)')
-            .is('parent_id', null) // Only fetch parent products
-            .eq('is_available', true) // Filter only available products
-            .range(0, 50); // Get more as we might filter some out if complex
+        const trimmedQuery = query.trim();
 
         // Check if query is numeric (potential barcode)
-        const isNumeric = /^\d+$/.test(query.trim());
+        const isNumeric = /^\d+$/.test(trimmedQuery);
 
         if (isNumeric) {
-            // Assume 'barcode' column exists, fallback to name check if needed or just specific logic
-            // User requested eq('barcode', query)
-            dbQuery = dbQuery.eq('barcode', query.trim());
-        } else {
-            // We want to find parent products where either the parent matches, OR any of its children match.
-            // In standard PostgREST this is tricky without a custom view or RPC, but we can do a simplified
-            // approach: we can use the `or` filter with an embedded resource if supported, but typically it isn't.
-            // As a fallback for now, we just fetch a larger subset and filter in memory, OR we can search all products
-            // and group them. Let's do a subquery-like approach if possible, or search independently.
-            // Easiest approach for robust filtering: search all products, then resolve to their parents.
-            // But to keep it simple and within the current schema, let's just search all names and then deduplicate
-            // by parent_id.
-
-            const rawSearchQuery = supabaseClient
+            const { data, error } = await supabaseClient
                 .from('products')
-                .select('id, parent_id')
-                .eq('is_available', true)
-                .ilike('name', `%${query.trim()}%`)
-                .limit(50);
+                .select('id, name, price, image, is_available')
+                .eq('barcode', trimmedQuery)
+                .limit(19);
 
-            const { data: searchHits, error: searchError } = await rawSearchQuery;
-            if (searchError) throw searchError;
-
-            if (!searchHits || searchHits.length === 0) return [];
-
-            // Collect the parent IDs we need to fetch
-            const parentIdsToFetch = Array.from(new Set(
-                searchHits.map(hit => hit.parent_id ? hit.parent_id : hit.id)
-            ));
-
-            dbQuery = dbQuery.in('id', parentIdsToFetch);
+            if (error) {
+                console.error("Error searching products by barcode:", error);
+                return [];
+            }
+            return (data || []).map(mapToProduct);
         }
 
-        const { data, error } = await dbQuery.order('created_at', { ascending: false }).limit(19);
+        // Text search: find all products matching the name (parents AND variants individually)
+        const lowerQuery = trimmedQuery.toLowerCase();
 
-        if (error) {
-            console.error("Error searching products:", error);
-            return [];
-        }
+        const { data: searchHits, error: searchError } = await supabaseClient
+            .from('products')
+            .select('id, name, price, image, is_available')
+            .ilike('name', `%${trimmedQuery}%`)
+            .limit(50);
 
-        return (data || []).map(mapToProduct);
+        if (searchError) throw searchError;
+        if (!searchHits || searchHits.length === 0) return [];
+
+        // Rank: exact match > starts with > contains
+        const ranked = [...searchHits].sort((a, b) => {
+            const aName = (a.name || '').toLowerCase().trim();
+            const bName = (b.name || '').toLowerCase().trim();
+            const aScore = aName === lowerQuery ? 0 : aName.startsWith(lowerQuery) ? 1 : 2;
+            const bScore = bName === lowerQuery ? 0 : bName.startsWith(lowerQuery) ? 1 : 2;
+            return aScore - bScore;
+        });
+
+        // Return each product as standalone (no variants grouping)
+        return ranked.slice(0, 19).map(mapToProduct);
     } catch (e) {
         console.error("Exception searching products:", e);
         return [];
