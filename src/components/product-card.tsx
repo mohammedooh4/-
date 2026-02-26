@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import type { Product } from '@/types/product';
 import { AspectRatio } from "@/components/ui/aspect-ratio"
@@ -33,15 +33,32 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
   // Include the main product as the first item, then append variants
   const allProducts = [product, ...(product.variants || [])];
 
-  // Calculate initial index based on search query if it exists
+  // Calculate initial index based on search query — prioritize exact match, then starts-with, then includes
   const initialIndex = (() => {
     if (!searchQuery) return 0;
-    const query = searchQuery.toLowerCase();
-    const index = allProducts.findIndex(p => p.name.toLowerCase().includes(query));
-    return index !== -1 ? index : 0;
+    const query = searchQuery.toLowerCase().trim();
+    // 1. Exact match
+    const exactIdx = allProducts.findIndex(p => p.name.toLowerCase().trim() === query);
+    if (exactIdx !== -1) return exactIdx;
+    // 2. Starts with the query
+    const startsIdx = allProducts.findIndex(p => p.name.toLowerCase().trim().startsWith(query));
+    if (startsIdx !== -1) return startsIdx;
+    // 3. Contains the query
+    const includesIdx = allProducts.findIndex(p => p.name.toLowerCase().includes(query));
+    return includesIdx !== -1 ? includesIdx : 0;
   })();
 
   const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const thumbsRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll thumbnails to keep active one visible
+  useEffect(() => {
+    const container = thumbsRef.current;
+    if (!container) return;
+    const activeThumb = container.children[activeIndex] as HTMLElement;
+    if (!activeThumb) return;
+    activeThumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [activeIndex]);
 
   const activeProduct = allProducts[activeIndex] || product;
   const isUnavailable = activeProduct.is_available === false;
@@ -178,10 +195,13 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
 
           {/* Thumbnails (Inside the gray box at the bottom) */}
           {allProducts.length > 1 && (
-            <div className="absolute bottom-2.5 md:bottom-3 left-0 right-0 z-20">
+            <div
+              className="absolute bottom-1 md:bottom-2 left-0 right-0 z-20 overflow-x-auto px-2 py-1"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+            >
               <div
-                className="flex items-center justify-center gap-1.5 md:gap-2 overflow-x-auto w-full px-2"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                ref={thumbsRef}
+                className="flex items-center gap-1.5 md:gap-2 w-max"
               >
                 {allProducts.map((prod, idx) => (
                   <button
@@ -191,14 +211,15 @@ export function ProductCard({ product, categoryName, searchQuery }: ProductCardP
                       e.stopPropagation();
                       setActiveIndex(idx);
                     }}
-                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-background ${idx === activeIndex ? 'w-11 h-11 md:w-14 md:h-14 shadow-neumorph-inset p-1' : 'w-9 h-9 md:w-11 md:h-11 shadow-neumorph-sm hover:shadow-neumorph-inset-sm p-0.5 opacity-80 hover:opacity-100'}`}
+                    style={{ scrollSnapAlign: 'center' }}
+                    className={`relative flex-shrink-0 transition-all rounded-full overflow-hidden bg-background ${idx === activeIndex ? 'w-9 h-9 md:w-12 md:h-12 shadow-neumorph-inset p-0.5 ring-2 ring-primary scale-110' : 'w-8 h-8 md:w-10 md:h-10 shadow-neumorph-sm hover:shadow-neumorph-inset-sm p-0.5 opacity-70 hover:opacity-100'}`}
                     aria-label={`عرض ${prod.name}`}
                   >
                     <Image
                       src={getOptimizedImage(prod.image)}
                       alt={`صورة ${prod.name}`}
                       fill
-                      sizes="56px"
+                      sizes="48px"
                       className="object-cover rounded-full"
                     />
                   </button>
