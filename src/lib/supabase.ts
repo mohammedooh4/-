@@ -149,6 +149,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
             const { data, error } = await supabaseClient
                 .from('products')
                 .select('id, name, price, image, is_available')
+                .is('parent_id', null)
                 .eq('barcode', trimmedQuery)
                 .limit(19);
 
@@ -159,25 +160,50 @@ export async function searchProducts(query: string): Promise<Product[]> {
             return (data || []).map(mapToProduct);
         }
 
-        // Text search: find all products matching the name (parents AND variants individually)
+        // Text search: split query into words for partial/flexible matching
         const lowerQuery = trimmedQuery.toLowerCase();
+        const keywords = lowerQuery.split(/\s+/).filter(k => k.length > 0);
+
+        // Build an OR query for all keywords
+        const orConditions = keywords.map(keyword => `name.ilike.%${keyword}%`).join(',');
 
         const { data: searchHits, error: searchError } = await supabaseClient
             .from('products')
             .select('id, name, price, image, is_available')
-            .ilike('name', `%${trimmedQuery}%`)
-            .limit(50);
+            .or(orConditions)
+            .limit(200);
 
         if (searchError) throw searchError;
         if (!searchHits || searchHits.length === 0) return [];
 
-        // Rank: exact match > starts with > contains
-        const ranked = [...searchHits].sort((a, b) => {
+        // Deduplicate results by ID to prevent repeated products
+        const uniqueHits = searchHits.filter((value, index, self) =>
+            index === self.findIndex((t) => (
+                t.id === value.id
+            ))
+        );
+
+        // Rank: exact match > all words match > some words match
+        const ranked = [...uniqueHits].sort((a, b) => {
             const aName = (a.name || '').toLowerCase().trim();
             const bName = (b.name || '').toLowerCase().trim();
-            const aScore = aName === lowerQuery ? 0 : aName.startsWith(lowerQuery) ? 1 : 2;
-            const bScore = bName === lowerQuery ? 0 : bName.startsWith(lowerQuery) ? 1 : 2;
-            return aScore - bScore;
+
+            // Exact matches get top priority
+            if (aName === lowerQuery && bName !== lowerQuery) return -1;
+            if (bName === lowerQuery && aName !== lowerQuery) return 1;
+
+            // Count how many keywords match
+            const aMatches = keywords.filter(k => aName.includes(k)).length;
+            const bMatches = keywords.filter(k => bName.includes(k)).length;
+
+            if (aMatches !== bMatches) {
+                return bMatches - aMatches; // More matches = better rank
+            }
+
+            // Fallback to starts-with priority
+            const aStarts = keywords.some(k => aName.startsWith(k)) ? 1 : 0;
+            const bStarts = keywords.some(k => bName.startsWith(k)) ? 1 : 0;
+            return bStarts - aStarts;
         });
 
         // Return each product as standalone (no variants grouping)
