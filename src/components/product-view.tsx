@@ -52,11 +52,12 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
     const [isSearching, setIsSearching] = useState(false);
 
     const observerTarget = useRef<HTMLDivElement>(null);
+    const hasRestoredCache = useRef(false);
 
-    // Initial Cache Check
+    // Initial Cache Check — only on mount
     useEffect(() => {
-        // Skip cache check if searching
-        if (searchQuery) return;
+        if (hasRestoredCache.current) return;
+        hasRestoredCache.current = true;
 
         const cachedData = sessionStorage.getItem(cacheKey);
         const cachedTs = sessionStorage.getItem(cacheTsKey);
@@ -79,7 +80,7 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
                 }
             }
         }
-    }, [cacheKey, cacheTsKey, searchQuery]);
+    }, [cacheKey, cacheTsKey]);
 
     // Update Cache on products change
     useEffect(() => {
@@ -114,26 +115,46 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
     }, [products, cacheKey, cacheTsKey, searchQuery]);
 
     // Search Logic
+    const latestSearchRef = useRef(searchQuery);
+    const initialProductsRef = useRef(initialProducts);
+    initialProductsRef.current = initialProducts;
+
     useEffect(() => {
+        latestSearchRef.current = searchQuery;
+        let isCancelled = false;
+
         const delayDebounceFn = setTimeout(async () => {
             if (searchQuery.trim()) {
                 setIsSearching(true);
-                setHasMore(false); // Disable infinite scroll during search
+                setHasMore(false);
+                window.scrollTo(0, 0);
                 const results = await searchProducts(searchQuery);
-                setProducts(results);
+
+                // Only apply results if this is still the latest search
+                if (isCancelled || latestSearchRef.current !== searchQuery) return;
+
+                // Deduplicate results by ID
+                const uniqueResults = results.filter((value, index, self) =>
+                    index === self.findIndex((t) => t.id === value.id)
+                );
+
+                setProducts(uniqueResults);
                 setIsSearching(false);
-            } else if (searchQuery === '' && !isSearching) {
-                // Reset to initial/cached state when search clears
-                // Ideally we'd restore from cache or props. For now, reset to props or reload window to be safe/clean?
-                // Or just reset to initialProducts and let Cache effect restore if valid
-                setProducts(initialProducts);
+            } else if (searchQuery === '') {
+                // Reset to initial state when search clears
+                setProducts(initialProductsRef.current);
                 setPage(1);
                 setHasMore(true);
+                setIsSearching(false);
+                window.scrollTo(0, 0);
             }
-        }, 500);
+        }, 400);
 
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery, initialProducts]);
+        return () => {
+            isCancelled = true;
+            clearTimeout(delayDebounceFn);
+        };
+    }, [searchQuery]);
 
 
     const handleRefresh = useCallback(() => {
@@ -217,36 +238,42 @@ export function ProductView({ initialProducts, initialCategories, activeCategory
     return (
         <>
             {isNavigating && <LoadingOverlay message="جاري تحميل..." />}
-            <main className="container mx-auto px-4 py-8 md:py-12 pb-24">
-                {/* Header Section */}
-                <div className="flex flex-col gap-6 mb-8">
-                    {/* Top Row: Greeting */}
-                    <div className="flex justify-between items-center">
-                        <div className="flex flex-col">
-                            <span className="text-muted-foreground text-sm">مرحباً,</span>
-                            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                                {displayName}
-                            </h1>
+            {/* Fixed Header */}
+            <div
+                className="fixed top-0 left-0 right-0 z-40 bg-background"
+                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)' }}
+            >
+                {/* Top bar: Greeting + Store icon */}
+                <div className="container mx-auto px-4 pt-4 pb-2 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary text-primary-foreground rounded-xl shadow-md flex items-center justify-center">
+                            <Store className="h-5 w-5" />
                         </div>
-                        <div className="flex-shrink-0 w-14 h-14 bg-primary text-primary-foreground rounded-2xl shadow-lg ring-4 ring-primary/10 flex items-center justify-center">
-                            <Store className="h-8 w-8" />
+                        <div>
+                            <p className="text-xs text-muted-foreground leading-none">مرحباً,</p>
+                            <h1 className="text-lg font-bold text-foreground leading-tight">{displayName}</h1>
                         </div>
                     </div>
+                </div>
 
-                    {/* Search Bar */}
+                {/* Search bar */}
+                <div className="container mx-auto px-4 pb-3">
                     <div className="relative w-full">
-                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="ماذا تريد أن تطلب اليوم؟"
-                            className="pr-12 h-14 rounded-2xl bg-background border-none shadow-neumorph-inset text-base"
+                            placeholder="ابحث عن منتج..."
+                            className="pr-10 h-11 rounded-xl bg-muted/50 border border-border/60 text-sm placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-
-                    {/* Categories Section */}
-
                 </div>
+            </div>
+
+            {/* Spacer to push content below the fixed header */}
+            <div className="h-[120px]" />
+
+            <main className="container mx-auto px-4 py-4 pb-24">
 
                 {/* Product Grid */}
                 {isSearching ? (
