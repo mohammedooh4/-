@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabaseClient } from '@/lib/supabase';
 import { useAuth } from './auth-context';
 import { Product } from '@/types/product';
-import { getProductById_client } from '@/lib/supabase';
+import { getProductsByIds_client } from '@/lib/supabase';
 
 interface FavoritesContextType {
     favoriteIds: string[];
@@ -47,18 +47,15 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         fetchFavorites();
     }, [user]);
 
-    // Fetch product details for the favored IDs
+    // Fetch product details for the favored IDs (batch fetch for performance)
     useEffect(() => {
         async function fetchFavoriteProducts() {
             if (favoriteIds.length === 0) {
                 setFavoriteProducts([]);
                 return;
             }
-            const products: Product[] = [];
-            for (const id of favoriteIds) {
-                const prod = await getProductById_client(id);
-                if (prod) products.push(prod);
-            }
+            // Batch fetch all favorite products in a single query
+            const products = await getProductsByIds_client(favoriteIds);
             setFavoriteProducts(products);
         }
         fetchFavoriteProducts();
