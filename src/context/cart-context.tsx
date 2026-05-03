@@ -3,7 +3,7 @@
 
 import type { Product } from '@/types/product';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { getProductById_client } from '@/lib/supabase';
+import { getProductsByIds_client } from '@/lib/supabase';
 
 // Storing only essential info in localStorage
 interface StoredCartItem {
@@ -49,7 +49,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // 2. Fetch product details based on stored IDs
+  // 2. Fetch product details based on stored IDs (batch fetch for performance)
   useEffect(() => {
     const fetchCartDetails = async () => {
       if (storedItems.length === 0) {
@@ -59,21 +59,33 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setIsLoading(true);
-      const detailedItems: CartItem[] = [];
-      for (const item of storedItems) {
-        // Ensure the ID is a string for fetching
+
+      // Parse stored items to extract product IDs and options
+      const parsedItems = storedItems.map(item => {
         const combinedId = String(item.id);
         const [productId, selectedOption] = combinedId.split('_option_');
+        return { productId, selectedOption, quantity: item.quantity };
+      });
 
-        const product = await getProductById_client(productId);
+      // Batch fetch all products in a single query
+      const uniqueProductIds = [...new Set(parsedItems.map(item => item.productId))];
+      const products = await getProductsByIds_client(uniqueProductIds);
+
+      // Map products back to cart items with quantities and options
+      const productMap = new Map(products.map(p => [p.id, p]));
+      const detailedItems: CartItem[] = [];
+
+      for (const item of parsedItems) {
+        const product = productMap.get(item.productId);
         if (product) {
           detailedItems.push({
             ...product,
             quantity: item.quantity,
-            selectedOption: selectedOption || undefined
+            selectedOption: item.selectedOption || undefined
           });
         }
       }
+
       setCartItems(detailedItems);
       setIsLoading(false);
     };
