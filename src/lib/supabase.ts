@@ -36,6 +36,30 @@ function mapToProduct(data: any): Product {
     };
 }
 
+// CLIENT-SIDE FUNCTION: Batch fetch multiple products by IDs in a single query
+export async function getProductsByIds_client(ids: string[]): Promise<Product[]> {
+    if (!supabaseClient || ids.length === 0) {
+        return FALLBACK_PRODUCTS.filter(p => ids.includes(p.id));
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('products')
+            .select('*, variants:products!parent_id(*)')
+            .in('id', ids);
+
+        if (error) {
+            console.error('Error batch fetching products:', error);
+            return FALLBACK_PRODUCTS.filter(p => ids.includes(p.id));
+        }
+
+        return (data || []).map(mapToProduct);
+    } catch (e) {
+        console.error('Exception batch fetching products:', e);
+        return FALLBACK_PRODUCTS.filter(p => ids.includes(p.id));
+    }
+}
+
 // CLIENT-SIDE FUNCTION (can also be used on server)
 export async function getProductById_client(id: string): Promise<Product | undefined> {
     if (!supabaseClient) {
